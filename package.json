@@ -1,0 +1,16 @@
+{
+  "name": "vilnius",
+  "version": "1.0.0",
+  "description": "Browser runner with extension and cookie support",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsc && node dist/main.js"
+  },
+  "dependencies": {
+    "playwright": "^1.40.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "@types/node": "^20.0.0"
+  }
+}
