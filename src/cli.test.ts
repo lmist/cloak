@@ -2,6 +2,22 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { isHeadlessEnabled, parseCli } from "./cli.js";
 
+function captureStderr<T>(fn: () => T): { result: T | undefined; stderr: string } {
+  const originalWrite = process.stderr.write.bind(process.stderr);
+  let stderr = "";
+
+  process.stderr.write = ((chunk: string | Uint8Array) => {
+    stderr += String(chunk);
+    return true;
+  }) as typeof process.stderr.write;
+
+  try {
+    return { result: fn(), stderr };
+  } finally {
+    process.stderr.write = originalWrite;
+  }
+}
+
 test("parseCli defaults to run mode with headless false", () => {
   assert.deepEqual(parseCli(["node", "dist/main.js"]), {
     mode: "run",
@@ -99,6 +115,41 @@ test("parseCli rejects unsupported browser values for import-cookies", () => {
       ]),
     /unsupported browser/i,
   );
+});
+
+test("parseCli does not write Commander errors to stderr for run mode", () => {
+  const { stderr } = captureStderr(() => {
+    assert.throws(
+      () =>
+        parseCli([
+          "node",
+          "dist/main.js",
+          "--cookie-url",
+          "https://x.com",
+        ]),
+      /cookies-from-browser/i,
+    );
+  });
+
+  assert.equal(stderr, "");
+});
+
+test("parseCli does not write Commander errors to stderr for import-cookies mode", () => {
+  const { stderr } = captureStderr(() => {
+    assert.throws(
+      () =>
+        parseCli([
+          "node",
+          "dist/main.js",
+          "import-cookies",
+          "--browser",
+          "chrome",
+        ]),
+      /url/i,
+    );
+  });
+
+  assert.equal(stderr, "");
 });
 
 test("parseCli rejects unsupported browser values for runtime browser cookies", () => {

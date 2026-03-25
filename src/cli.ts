@@ -28,8 +28,15 @@ function parseChromeBrowser(value: string): "chrome" {
   return "chrome";
 }
 
+function silenceCommanderOutput(command: Command): Command {
+  return command.configureOutput({
+    writeErr: () => undefined,
+    writeOut: () => undefined,
+  });
+}
+
 function parseRunMode(argv: string[]): RunModeConfig {
-  const program = new Command();
+  const program = silenceCommanderOutput(new Command());
 
   program
     .exitOverride()
@@ -76,27 +83,29 @@ function parseRunMode(argv: string[]): RunModeConfig {
 }
 
 function parseImportCookiesMode(argv: string[]): ImportCookiesConfig {
-  const program = new Command();
+  const program = silenceCommanderOutput(new Command());
 
-  program
+  const importCommand = silenceCommanderOutput(
+    program
     .exitOverride()
     .allowUnknownOption(false)
     .allowExcessArguments(false)
     .name("hedlis")
-    .command("import-cookies")
+      .command("import-cookies"),
+  )
     .requiredOption("--browser <browser>", "browser to import cookies from", parseChromeBrowser)
     .requiredOption("--url <url>", "site URL to scope browser cookies")
     .option("--chrome-profile <profile>", "Chrome profile name")
     .option("--output <output>", "output file path");
 
   const parsed = program.parse(argv, { from: "node" });
-  const importCommand = parsed.commands[0];
+  const parsedImportCommand = parsed.commands[0];
 
-  if (!importCommand) {
+  if (!parsedImportCommand) {
     throw new Error("import-cookies command requires a subcommand");
   }
 
-  const options = importCommand.opts<{
+  const options = parsedImportCommand.opts<{
     browser: "chrome";
     url: string;
     chromeProfile?: string;
