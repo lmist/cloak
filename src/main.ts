@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { chromium } from "playwright";
 import path from "node:path";
 import os from "node:os";

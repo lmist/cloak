@@ -1,7 +1,10 @@
 {
-  "name": "vilnius",
+  "name": "hedlis",
   "version": "1.0.0",
   "description": "Browser runner with extension and cookie support",
+  "bin": {
+    "hedlis": "dist/main.js"
+  },
   "scripts": {
     "build": "tsc",
     "start": "tsc && node dist/main.js",
