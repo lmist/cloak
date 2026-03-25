@@ -40,6 +40,32 @@ test("parseCli parses runtime browser-cookie config", () => {
   );
 });
 
+test("parseCli rejects --cookie-url without --cookies-from-browser", () => {
+  assert.throws(
+    () =>
+      parseCli([
+        "node",
+        "dist/main.js",
+        "--cookie-url",
+        "https://x.com",
+      ]),
+    /cookies-from-browser/i,
+  );
+});
+
+test("parseCli rejects --chrome-profile without --cookies-from-browser", () => {
+  assert.throws(
+    () =>
+      parseCli([
+        "node",
+        "dist/main.js",
+        "--chrome-profile",
+        "Profile 2",
+      ]),
+    /cookies-from-browser/i,
+  );
+});
+
 test("parseCli parses import-cookies mode", () => {
   assert.deepEqual(
     parseCli([
@@ -153,19 +179,16 @@ test("isHeadlessEnabled validates import-cookies invocations through parseCli", 
   );
 });
 
-test("parseCli keeps import-cookies as an option value in run mode", () => {
-  assert.deepEqual(
-    parseCli([
-      "node",
-      "dist/main.js",
-      "--chrome-profile",
-      "import-cookies",
-      "--headless",
-    ]),
-    {
-      mode: "run",
-      headless: true,
-    },
+test("parseCli rejects import-cookies as a chrome profile value without browser cookies", () => {
+  assert.throws(
+    () =>
+      parseCli([
+        "node",
+        "dist/main.js",
+        "--chrome-profile",
+        "import-cookies",
+      ]),
+    /cookies-from-browser/i,
   );
 });
 

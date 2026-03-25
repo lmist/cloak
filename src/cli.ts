@@ -51,6 +51,10 @@ function parseRunMode(argv: string[]): RunModeConfig {
     throw new Error("--cookie-url is required when --cookies-from-browser is used");
   }
 
+  if (!options.cookiesFromBrowser && (options.cookieUrl || options.chromeProfile)) {
+    throw new Error("--cookie-url and --chrome-profile require --cookies-from-browser");
+  }
+
   const browserCookies = options.cookiesFromBrowser
     ? {
         browser: options.cookiesFromBrowser,
