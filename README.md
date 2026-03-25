@@ -26,6 +26,16 @@ hedlis --help
 hedlis --headless
 ```
 
+## CI
+
+GitHub Actions runs CI on pull requests and pushes to `main`. The workflow uses the current Node LTS line and runs:
+
+```bash
+npm ci
+npm test
+npm run build
+```
+
 ### Extensions
 
 Drop `.zip` files into `extensions/`. Each zip should contain a Chrome extension (with `manifest.json` at root or one level deep). They get unzipped to a temp dir and loaded into Chromium on launch.
