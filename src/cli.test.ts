@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseCli } from "./cli.js";
+import { isHeadlessEnabled, parseCli } from "./cli.js";
 
 test("parseCli defaults to run mode with headless false", () => {
   assert.deepEqual(parseCli(["node", "dist/main.js"]), {
@@ -87,5 +87,53 @@ test("parseCli rejects unsupported browser values for runtime browser cookies", 
         "https://x.com",
       ]),
     /unsupported browser/i,
+  );
+});
+
+test("parseCli requires --cookie-url when --cookies-from-browser is used", () => {
+  assert.throws(
+    () =>
+      parseCli([
+        "node",
+        "dist/main.js",
+        "--cookies-from-browser",
+        "chrome",
+      ]),
+    /cookie-url/i,
+  );
+});
+
+test("parseCli requires --browser for import-cookies", () => {
+  assert.throws(
+    () =>
+      parseCli([
+        "node",
+        "dist/main.js",
+        "import-cookies",
+        "--url",
+        "https://x.com",
+      ]),
+    /browser/i,
+  );
+});
+
+test("parseCli requires --url for import-cookies", () => {
+  assert.throws(
+    () =>
+      parseCli([
+        "node",
+        "dist/main.js",
+        "import-cookies",
+        "--browser",
+        "chrome",
+      ]),
+    /url/i,
+  );
+});
+
+test("isHeadlessEnabled ignores import-cookies subcommand for compatibility", () => {
+  assert.equal(
+    isHeadlessEnabled(["node", "dist/main.js", "import-cookies"]),
+    false,
   );
 });

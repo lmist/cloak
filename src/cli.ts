@@ -115,6 +115,10 @@ export function parseCli(argv: string[]): CliConfig {
 }
 
 export function isHeadlessEnabled(argv: string[]): boolean {
+  if (argv.includes("import-cookies")) {
+    return false;
+  }
+
   const parsed = parseCli(argv);
   return parsed.mode === "run" ? parsed.headless : false;
 }
