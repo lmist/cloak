@@ -33,16 +33,22 @@ export function defaultCookieOutputPath(
 }
 
 function normalizeChromeCookie(raw: ChromePuppeteerCookie): Cookie {
-  return normalizeCookie({
+  const normalized = {
     name: raw.name,
     value: raw.value,
     domain: raw.domain,
     path: raw.path,
-    expires: chromiumTimestampToUnixSeconds(raw.expires),
     httpOnly: raw.HttpOnly,
     secure: raw.Secure,
     sameSite: raw.sameSite,
-  });
+  } as Parameters<typeof normalizeCookie>[0] & { expires?: number };
+
+  const expires = chromiumTimestampToUnixSeconds(raw.expires);
+  if (expires > 0) {
+    normalized.expires = expires;
+  }
+
+  return normalizeCookie(normalized);
 }
 
 export async function readChromeCookies(
