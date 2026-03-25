@@ -131,9 +131,24 @@ test("parseCli requires --url for import-cookies", () => {
   );
 });
 
-test("isHeadlessEnabled ignores import-cookies subcommand for compatibility", () => {
+test("isHeadlessEnabled returns false for valid import-cookies invocations", () => {
   assert.equal(
-    isHeadlessEnabled(["node", "dist/main.js", "import-cookies"]),
+    isHeadlessEnabled([
+      "node",
+      "dist/main.js",
+      "import-cookies",
+      "--browser",
+      "chrome",
+      "--url",
+      "https://x.com",
+    ]),
     false,
+  );
+});
+
+test("isHeadlessEnabled validates import-cookies invocations through parseCli", () => {
+  assert.throws(
+    () => isHeadlessEnabled(["node", "dist/main.js", "import-cookies"]),
+    /required option/i,
   );
 });
