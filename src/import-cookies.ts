@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
+  CHROME_COOKIE_LIMITATION_WARNING,
   defaultCookieOutputPath,
   readChromeCookies,
 } from "./chrome-cookies.js";
@@ -18,9 +19,11 @@ export async function importCookiesCommand(
   options: ImportCookiesCommandOptions,
   dependencies: {
     readChromeCookies?: ReadChromeCookies;
+    warn?: (message: string) => void;
   } = {}
 ): Promise<{ count: number; outputPath: string }> {
   const readCookies = dependencies.readChromeCookies ?? readChromeCookies;
+  const warn = dependencies.warn ?? console.warn;
   const cookies = await readCookies({
     url: options.url,
     profile: options.profile,
@@ -29,6 +32,8 @@ export async function importCookiesCommand(
   if (cookies.length === 0) {
     throw new Error(`No cookies found for ${options.url}`);
   }
+
+  warn(CHROME_COOKIE_LIMITATION_WARNING);
 
   const outputRoot = options.outputRoot ?? process.cwd();
   const outputPath = options.output

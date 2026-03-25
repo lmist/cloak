@@ -2,6 +2,9 @@ import path from "node:path";
 import chrome from "chrome-cookies-secure";
 import { normalizeCookie, type Cookie } from "./cookies.js";
 
+export const CHROME_COOKIE_LIMITATION_WARNING =
+  "Known limitation: Chrome cookie extraction may collapse same-name cookies across different paths or subdomains before hedlis sees them. If imported/runtime cookies look incomplete or login still fails, this may be the cause.";
+
 type ChromePuppeteerCookie = {
   name: string;
   value: string;

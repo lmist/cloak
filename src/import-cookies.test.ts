@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { importCookiesCommand } from "./import-cookies.js";
 import type { Cookie } from "./cookies.js";
+import { CHROME_COOKIE_LIMITATION_WARNING } from "./chrome-cookies.js";
 
 function createTempOutputRoot(): string {
   const outputRoot = fs.mkdtempSync(path.join(os.tmpdir(), "vilnius-import-"));
@@ -94,6 +95,24 @@ test("importCookiesCommand overwrites an existing default target file", async ()
     JSON.parse(fs.readFileSync(outputPath, "utf8")),
     sampleCookies()
   );
+});
+
+test("importCookiesCommand warns about the Chrome duplicate-cookie limitation", async () => {
+  const outputRoot = createTempOutputRoot();
+  const warnings: string[] = [];
+
+  await importCookiesCommand(
+    {
+      url: "https://x.com",
+      outputRoot,
+    },
+    {
+      readChromeCookies: async () => sampleCookies(),
+      warn: (message: string) => warnings.push(message),
+    }
+  );
+
+  assert.deepEqual(warnings, [CHROME_COOKIE_LIMITATION_WARNING]);
 });
 
 test("importCookiesCommand fails fast when Chrome returns no cookies", async () => {

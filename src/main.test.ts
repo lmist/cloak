@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { parseCli, isHeadlessEnabled, type RunModeConfig } from "./cli.js";
 import type { Cookie } from "./cookies.js";
 import { main, resolveStartupCookies } from "./main.js";
+import { CHROME_COOKIE_LIMITATION_WARNING } from "./chrome-cookies.js";
 
 test("startup defaults to headed mode", () => {
   assert.equal(isHeadlessEnabled(["node", "dist/main.js"]), false);
@@ -74,6 +75,27 @@ test("runtime browser cookies merge with loadCookies results", async () => {
     cookie({ name: "disk", value: "1" }),
     cookie({ name: "runtime", value: "2" }),
   ]);
+});
+
+test("runtime browser-cookie loading warns about the Chrome duplicate-cookie limitation", async () => {
+  const cli = parseRunCli([
+    "node",
+    "dist/main.js",
+    "--cookies-from-browser",
+    "chrome",
+    "--cookie-url",
+    "https://x.com",
+  ]);
+  const warnings: string[] = [];
+
+  await resolveStartupCookies(cli, {
+    cookiesDir: "/tmp/cookies",
+    loadCookies: async () => [],
+    readChromeCookies: async () => [cookie({ name: "runtime", value: "2" })],
+    warn: (message: string) => warnings.push(message),
+  });
+
+  assert.deepEqual(warnings, [CHROME_COOKIE_LIMITATION_WARNING]);
 });
 
 test("browser-imported cookies win exact name-domain-path collisions", async () => {

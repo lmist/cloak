@@ -6,12 +6,16 @@ import { prepareExtensions } from "./extension.js";
 import { loadCookies, mergeCookies, type Cookie } from "./cookies.js";
 import { parseCli, type RunModeConfig } from "./cli.js";
 import { importCookiesCommand } from "./import-cookies.js";
-import { readChromeCookies } from "./chrome-cookies.js";
+import {
+  CHROME_COOKIE_LIMITATION_WARNING,
+  readChromeCookies,
+} from "./chrome-cookies.js";
 
 type ResolveStartupCookiesDependencies = {
   cookiesDir?: string;
   loadCookies?: typeof loadCookies;
   readChromeCookies?: typeof readChromeCookies;
+  warn?: (message: string) => void;
 };
 
 type StartupContext = {
@@ -50,6 +54,7 @@ export async function resolveStartupCookies(
 
   const readChromeCookiesFn =
     dependencies.readChromeCookies ?? readChromeCookies;
+  const warn = dependencies.warn ?? console.warn;
   const browserCookies = await readChromeCookiesFn({
     url: cli.browserCookies.url,
     profile: cli.browserCookies.profile,
@@ -58,6 +63,8 @@ export async function resolveStartupCookies(
   if (browserCookies.length === 0) {
     throw new Error(`No cookies found for ${cli.browserCookies.url}`);
   }
+
+  warn(CHROME_COOKIE_LIMITATION_WARNING);
 
   return mergeCookies(diskCookies, browserCookies);
 }

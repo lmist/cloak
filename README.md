@@ -67,6 +67,8 @@ Use `--chrome-profile` when you want a specific Chrome profile. For persisted co
 
 Only Chrome is supported for browser-cookie access.
 
+Known limitation: Chrome cookie extraction currently depends on `chrome-cookies-secure`, which may collapse same-name cookies across different paths or subdomains before `hedlis` sees them. If imported/runtime cookies look incomplete or login still fails after a Chrome-cookie load, this may be the cause.
+
 ### Stopping
 
 Ctrl+C or close the browser window.
