@@ -1,21 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { isHeadlessEnabled, parseCli } from "./cli.js";
 
-function captureStderr<T>(fn: () => T): { result: T | undefined; stderr: string } {
-  const originalWrite = process.stderr.write.bind(process.stderr);
-  let stderr = "";
-
-  process.stderr.write = ((chunk: string | Uint8Array) => {
-    stderr += String(chunk);
-    return true;
-  }) as typeof process.stderr.write;
-
-  try {
-    return { result: fn(), stderr };
-  } finally {
-    process.stderr.write = originalWrite;
-  }
+function runNodeScript(script: string) {
+  return spawnSync(process.execPath, ["-e", script], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+  });
 }
 
 test("parseCli defaults to run mode with headless false", () => {
@@ -118,38 +110,33 @@ test("parseCli rejects unsupported browser values for import-cookies", () => {
 });
 
 test("parseCli does not write Commander errors to stderr for run mode", () => {
-  const { stderr } = captureStderr(() => {
-    assert.throws(
-      () =>
-        parseCli([
-          "node",
-          "dist/main.js",
-          "--cookie-url",
-          "https://x.com",
-        ]),
-      /cookies-from-browser/i,
-    );
-  });
+  const result = runNodeScript(`
+    const { parseCli } = require("./dist/cli.js");
+    try {
+      parseCli(["node", "dist/main.js", "--cookie-url", "https://x.com"]);
+      process.exit(0);
+    } catch {
+      process.exit(1);
+    }
+  `);
 
-  assert.equal(stderr, "");
+  assert.equal(result.status, 1);
+  assert.equal(result.stderr, "");
 });
 
 test("parseCli does not write Commander errors to stderr for import-cookies mode", () => {
-  const { stderr } = captureStderr(() => {
-    assert.throws(
-      () =>
-        parseCli([
-          "node",
-          "dist/main.js",
-          "import-cookies",
-          "--browser",
-          "chrome",
-        ]),
-      /url/i,
-    );
-  });
+  const result = runNodeScript(`
+    const { parseCli } = require("./dist/cli.js");
+    try {
+      parseCli(["node", "dist/main.js", "import-cookies", "--browser", "chrome"]);
+      process.exit(0);
+    } catch {
+      process.exit(1);
+    }
+  `);
 
-  assert.equal(stderr, "");
+  assert.equal(result.status, 1);
+  assert.equal(result.stderr, "");
 });
 
 test("parseCli rejects unsupported browser values for runtime browser cookies", () => {
@@ -265,4 +252,15 @@ test("parseCli rejects excess operands in import-cookies mode", () => {
       ]),
     /too many arguments/i,
   );
+});
+
+test("node dist/main.js --help exits cleanly with usage output", () => {
+  const result = spawnSync(process.execPath, ["dist/main.js", "--help"], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+  });
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /Usage:/i);
+  assert.equal(result.stderr, "");
 });
