@@ -157,6 +157,58 @@ test("main does not reach browser startup when explicit browser-cookie import re
   assert.equal(launchCalls, 0);
 });
 
+test("main honors an injected cookiesDir instead of resolving the working-directory cookies path", async () => {
+  const seenCookiesDirs: string[] = [];
+
+  await main(["node", "dist/main.js"], {
+    cookiesDir: "/tmp/injected-cookies",
+    loadCookies: async (cookiesDir: string) => {
+      seenCookiesDirs.push(cookiesDir);
+      return [];
+    },
+    prepareExtensions: async () => [],
+    makeTempDir: () => "/tmp/vilnius-profile",
+    makeDir: () => undefined,
+    writeFile: () => undefined,
+    launchPersistentContext: async () => fakeContext(),
+  });
+
+  assert.deepEqual(seenCookiesDirs, ["/tmp/injected-cookies"]);
+});
+
+test("main adds the resolved merged cookie set to the browser context on successful startup", async () => {
+  const addedCookies: Cookie[][] = [];
+
+  await main(
+    [
+      "node",
+      "dist/main.js",
+      "--cookies-from-browser",
+      "chrome",
+      "--cookie-url",
+      "https://x.com",
+    ],
+    {
+      cookiesDir: "/tmp/injected-cookies",
+      loadCookies: async () => [cookie({ name: "disk", value: "1" })],
+      readChromeCookies: async () => [
+        cookie({ name: "disk", value: "2" }),
+        cookie({ name: "runtime", value: "3" }),
+      ],
+      prepareExtensions: async () => [],
+      makeTempDir: () => "/tmp/vilnius-profile",
+      makeDir: () => undefined,
+      writeFile: () => undefined,
+      launchPersistentContext: async () => fakeContext({ addedCookies }),
+    },
+  );
+
+  assert.deepEqual(addedCookies, [[
+    cookie({ name: "disk", value: "2" }),
+    cookie({ name: "runtime", value: "3" }),
+  ]]);
+});
+
 function cookie(overrides: Partial<Cookie>): Cookie {
   return {
     name: overrides.name ?? "session",
@@ -170,4 +222,23 @@ function parseRunCli(argv: string[]): RunModeConfig {
   const cli = parseCli(argv);
   assert.equal(cli.mode, "run");
   return cli;
+}
+
+function fakeContext({
+  addedCookies,
+}: {
+  addedCookies?: Cookie[][];
+} = {}) {
+  return {
+    addCookies: async (cookies: Cookie[]) => {
+      addedCookies?.push(cookies);
+    },
+    browser: () => null,
+    on: (event: string, callback: () => void) => {
+      if (event === "close") {
+        callback();
+      }
+    },
+    close: async () => undefined,
+  };
 }

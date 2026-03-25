@@ -14,12 +14,26 @@ type ResolveStartupCookiesDependencies = {
   readChromeCookies?: typeof readChromeCookies;
 };
 
+type StartupContext = {
+  addCookies(cookies: Cookie[]): Promise<void>;
+  browser(): { on(event: "disconnected", listener: () => void): void } | null;
+  on(event: "close", listener: () => void): void;
+  close(): Promise<void>;
+};
+
 type MainDependencies = ResolveStartupCookiesDependencies & {
   prepareExtensions?: typeof prepareExtensions;
-  launchPersistentContext?: typeof chromium.launchPersistentContext;
-  makeTempDir?: typeof fs.mkdtempSync;
-  makeDir?: typeof fs.mkdirSync;
-  writeFile?: typeof fs.writeFileSync;
+  launchPersistentContext?: (
+    userDataDir: string,
+    options: {
+      headless: boolean;
+      channel: "chromium";
+      args: string[];
+    }
+  ) => Promise<StartupContext>;
+  makeTempDir?: (prefix: string) => string;
+  makeDir?: (path: string, options: { recursive: true }) => void;
+  writeFile?: (path: string, data: string) => void;
 };
 
 export async function resolveStartupCookies(
@@ -65,7 +79,7 @@ export async function main(
   }
 
   const extensionsDir = path.resolve("extensions");
-  const cookiesDir = path.resolve("cookies");
+  const cookiesDir = dependencies.cookiesDir ?? path.resolve("cookies");
   const cookies = await resolveStartupCookies(cli, {
     cookiesDir,
     loadCookies: dependencies.loadCookies,
