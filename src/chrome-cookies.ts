@@ -1,6 +1,6 @@
 import path from "node:path";
 import chrome from "chrome-cookies-secure";
-import type { Cookie } from "./cookies.js";
+import { normalizeCookie, type Cookie } from "./cookies.js";
 
 type ChromePuppeteerCookie = {
   name: string;
@@ -19,6 +19,12 @@ type ChromeCookieReader = (
   profile?: string
 ) => Promise<ChromePuppeteerCookie[]>;
 
+const CHROMIUM_EPOCH_MICROSECONDS = 11644473600000000;
+
+function chromiumTimestampToUnixSeconds(timestamp: number): number {
+  return Math.trunc((timestamp - CHROMIUM_EPOCH_MICROSECONDS) / 1000000);
+}
+
 export function defaultCookieOutputPath(
   url: string,
   cookiesDir: string
@@ -26,49 +32,17 @@ export function defaultCookieOutputPath(
   return path.join(cookiesDir, `${new URL(url).hostname.toLowerCase()}.json`);
 }
 
-function normalizeSameSite(
-  sameSite: string | undefined
-): Cookie["sameSite"] | undefined {
-  if (!sameSite) return undefined;
-
-  switch (sameSite.toLowerCase()) {
-    case "strict":
-      return "Strict";
-    case "lax":
-      return "Lax";
-    case "none":
-    case "no_restriction":
-      return "None";
-    case "unspecified":
-      return undefined;
-    default:
-      return undefined;
-  }
-}
-
 function normalizeChromeCookie(raw: ChromePuppeteerCookie): Cookie {
-  const cookie: Cookie = {
+  return normalizeCookie({
     name: raw.name,
     value: raw.value,
     domain: raw.domain,
     path: raw.path,
-    expires: Math.trunc(raw.expires),
-  };
-
-  if (typeof raw.HttpOnly === "boolean") {
-    cookie.httpOnly = raw.HttpOnly;
-  }
-
-  if (typeof raw.Secure === "boolean") {
-    cookie.secure = raw.Secure;
-  }
-
-  const sameSite = normalizeSameSite(raw.sameSite);
-  if (sameSite) {
-    cookie.sameSite = sameSite;
-  }
-
-  return cookie;
+    expires: chromiumTimestampToUnixSeconds(raw.expires),
+    httpOnly: raw.HttpOnly,
+    secure: raw.Secure,
+    sameSite: raw.sameSite,
+  });
 }
 
 export async function readChromeCookies(

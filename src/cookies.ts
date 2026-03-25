@@ -43,7 +43,7 @@ function normalizeSameSite(
   }
 }
 
-function normalizeCookie(raw: Cookie | BrowserExportCookie): Cookie {
+export function normalizeCookie(raw: Cookie | BrowserExportCookie): Cookie {
   const cookie: Cookie = {
     name: raw.name,
     value: raw.value,
