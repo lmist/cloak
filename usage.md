@@ -1,17 +1,27 @@
 # Usage
 
-## Import cookies and launch with Patchright
+## Install and build
 
-Import Instagram cookies from a specific Chrome profile, then launch with the Patchright engine:
+```bash
+bun install
+bunx patchright install chromium
+bun run build
+```
+
+## Import cookies and launch
 
 ```bash
 hedlis import-cookies --browser chrome --url https://instagram.com --chrome-profile "Profile 7"
-hedlis --engine patchright
+hedlis
+```
+
+## One-off runtime cookies
+
+```bash
+hedlis --cookies-from-browser chrome --cookie-url https://x.com
 ```
 
 ## List Chrome profiles
-
-Find the right `--chrome-profile` value:
 
 ```bash
 hedlis list-profiles

@@ -6,11 +6,11 @@ Source lives in [`src/`](/Users/lou/conductor/workspaces/mindv/vilnius/src). Run
 
 ## Build, Test, and Development Commands
 
-- `npm install`: install dependencies.
-- `npm run build`: compile TypeScript to `dist/`.
-- `npm test`: compile and run the full `node:test` suite from `dist/*.test.js`.
-- `npm start -- --headless`: build, then launch the CLI locally.
-- `node dist/main.js import-cookies --browser chrome --url https://example.com`: run the compiled CLI directly after building.
+- `bun install`: install dependencies, create `bun.lock`, and fetch the required extension archive into `extensions/`.
+- `bun test`: run the `node:test` suite directly from `src/*.test.ts` under Bun.
+- `bun run typecheck`: run `tsc --noEmit`.
+- `bun run build`: compile the standalone `dist/hedlis` Bun executable.
+- `bun run src/main.ts --help`: run the CLI from source during development.
 
 ## Coding Style & Naming Conventions
 
@@ -20,7 +20,7 @@ No formatter or linter is configured here, so preserve the repository’s curren
 
 ## Testing Guidelines
 
-Use the built-in `node:test` runner with `assert/strict`. Add tests in `src/<module>.test.ts`. Prefer dependency injection over real browser/profile access so tests stay hermetic. When changing startup or cookie behavior, cover both the helper-level logic and the top-level `main()` routing if behavior crosses module boundaries.
+Use the built-in `node:test` runner with `assert/strict`, executed via `bun test`. Add tests in `src/<module>.test.ts`. Prefer dependency injection over real browser/profile access so tests stay hermetic. When changing startup or cookie behavior, cover both the helper-level logic and the top-level `main()` routing if behavior crosses module boundaries.
 
 ## Commit & Pull Request Guidelines
 
@@ -28,9 +28,9 @@ Keep commit messages short, imperative, and specific, following the current hist
 
 For pull requests, include:
 - a short summary of user-visible behavior changes
-- test/build evidence (`npm test`, `npm run build`)
+- test/build evidence (`bun test`, `bun run typecheck`, `bun run build`)
 - any Chrome-cookie limitations or caveats that remain
 
 ## Security & Configuration Tips
 
-Browser-cookie access is explicit and Chrome-only. Treat imported/runtime cookies as sensitive data. Do not broaden URL handling beyond HTTP(S) without revisiting the Chrome cookie reader and its failure modes.
+Browser-cookie access is explicit and Chrome-only. Treat imported/runtime cookies as sensitive data. Do not broaden URL handling beyond HTTP(S) without revisiting the Chrome cookie reader and its failure modes. `hedlis` cannot run without `extensions/opencli-extension.zip`; preserve the pinned download URL and runtime validation/repair behavior unless the product requirement changes.

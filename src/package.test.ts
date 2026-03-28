@@ -17,50 +17,40 @@ test("package metadata exposes the hedlis binary", () => {
 
   assert.equal(packageJson.name, "hedlis");
   assert.deepEqual(packageJson.bin, {
-    hedlis: "dist/main.js",
+    hedlis: "src/main.ts",
   });
-  assert.deepEqual(packageJson.files, ["dist", "README.md", "usage.md"]);
-  assert.equal(packageJson.scripts?.prepare, undefined);
-  assert.equal(packageJson.scripts?.build, "tsc && chmod +x dist/main.js");
+  assert.deepEqual(packageJson.files, ["src", "README.md", "usage.md"]);
+  assert.equal(packageJson.scripts?.postinstall, "bun run src/install-extension.ts");
+  assert.equal(
+    packageJson.scripts?.build,
+    "bun build --compile --outfile dist/hedlis -e electron -e 'chromium-bidi/*' src/main.ts"
+  );
+  assert.equal(packageJson.scripts?.test, "bun test");
+  assert.equal(packageJson.scripts?.typecheck, "bunx tsc --noEmit");
   assert.ok(packageJson.dependencies?.patchright);
+  assert.ok(packageJson.dependencies?.["adm-zip"]);
 });
 
-test("compiled main entrypoint is executable as a node script", () => {
-  const mainScript = fs.readFileSync(path.resolve("dist/main.js"), "utf8");
-  const mainScriptMode = fs.statSync(path.resolve("dist/main.js")).mode & 0o777;
+test("main entrypoint is a bun script", () => {
+  const mainScript = fs.readFileSync(path.resolve("src/main.ts"), "utf8");
 
-  assert.match(mainScript, /^#!\/usr\/bin\/env node/m);
-  assert.equal(mainScriptMode & 0o111, 0o111);
+  assert.match(mainScript, /^#!\/usr\/bin\/env bun/m);
 });
 
-test("package tarball includes the compiled hedlis entrypoint", () => {
-  const packOutput = execFileSync("npm", ["pack", "--dry-run", "--json"], {
+test("package tarball includes the bun entrypoint instead of the legacy node dist bundle", () => {
+  const packOutput = execFileSync("bun", ["pm", "pack", "--dry-run"], {
     encoding: "utf8",
   });
-  const packResult = JSON.parse(packOutput) as Array<{
-    files?: Array<{ path?: string }>;
-  }>;
 
-  assert.ok(
-    packResult[0]?.files?.some((file) => file.path === "dist/main.js"),
-    "expected npm pack output to include dist/main.js"
-  );
+  assert.match(packOutput, /src\/main\.ts/);
+  assert.doesNotMatch(packOutput, /dist\/main\.js/);
 });
 
-test("compiled hedlis entrypoint is tracked in git for GitHub installs", () => {
-  const trackedPath = execFileSync(
-    "git",
-    ["ls-files", "--error-unmatch", "dist/main.js"],
-    { encoding: "utf8" }
-  ).trim();
-
-  assert.equal(trackedPath, "dist/main.js");
-});
-
-test("readme documents engine configuration and patchright setup", () => {
+test("readme documents the bun workflow and patchright setup", () => {
   const readme = fs.readFileSync(path.resolve("README.md"), "utf8");
 
-  assert.match(readme, /hedlis config set engine patchright/);
-  assert.match(readme, /hedlis config get engine/);
-  assert.match(readme, /npx patchright install chromium/);
+  assert.match(readme, /bun install/);
+  assert.match(readme, /bun run build/);
+  assert.match(readme, /bun test/);
+  assert.match(readme, /bunx patchright install chromium/);
 });

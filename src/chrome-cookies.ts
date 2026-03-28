@@ -1,5 +1,5 @@
 import path from "node:path";
-import chrome from "chrome-cookies-secure";
+import { createRequire } from "node:module";
 import { normalizeCookie, type Cookie } from "./cookies.js";
 
 export const CHROME_COOKIE_LIMITATION_WARNING =
@@ -55,8 +55,25 @@ function normalizeChromeCookie(raw: ChromePuppeteerCookie): Cookie {
 
 export async function readChromeCookies(
   options: { url: string; profile?: string },
-  getCookies: ChromeCookieReader = chrome.getCookiesPromised
+  getCookies: ChromeCookieReader = loadChromeCookieReader()
 ): Promise<Cookie[]> {
   const cookies = await getCookies(options.url, "puppeteer", options.profile);
   return cookies.map(normalizeChromeCookie);
+}
+
+function loadChromeCookieReader(): ChromeCookieReader {
+  const requireFromWorkingDirectory = createRequire(
+    path.join(process.cwd(), "__hedlis__.cjs")
+  );
+  const chromeCookiesSecure = requireFromWorkingDirectory(
+    "chrome-cookies-secure"
+  ) as {
+    getCookiesPromised?: ChromeCookieReader;
+  };
+
+  if (!chromeCookiesSecure.getCookiesPromised) {
+    throw new Error("chrome-cookies-secure does not expose getCookiesPromised");
+  }
+
+  return chromeCookiesSecure.getCookiesPromised;
 }

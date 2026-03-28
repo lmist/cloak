@@ -15,13 +15,14 @@ test("ci workflow runs on pull requests and pushes to main", () => {
   assert.match(workflow, /push:\s*\n\s+branches:\s*\n\s+- main/m);
 });
 
-test("ci workflow uses the current node lts line for test and build", () => {
+test("ci workflow uses bun for install, test, typecheck, and build", () => {
   const workflow = readCiWorkflow();
 
-  assert.match(workflow, /node-version:\s+lts\/\*/);
-  assert.match(workflow, /npm ci/);
-  assert.match(workflow, /npm test/);
-  assert.match(workflow, /npm run build/);
+  assert.match(workflow, /uses:\s+oven-sh\/setup-bun@/);
+  assert.match(workflow, /bun install --frozen-lockfile/);
+  assert.match(workflow, /bun test/);
+  assert.match(workflow, /bun run typecheck/);
+  assert.match(workflow, /bun run build/);
 });
 
 test("ci workflow cancels superseded runs and keeps read-only permissions", () => {

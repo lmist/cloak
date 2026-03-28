@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { isHeadlessEnabled, parseCli } from "./cli.js";
 
-function runNodeScript(script: string) {
-  return spawnSync(process.execPath, ["-e", script], {
+function runBunScript(script: string) {
+  return spawnSync("bun", ["-e", script], {
     cwd: process.cwd(),
     encoding: "utf8",
   });
@@ -29,8 +29,6 @@ test("parseCli parses runtime browser-cookie config", () => {
     parseCli([
       "node",
       "dist/main.js",
-      "--engine",
-      "patchright",
       "--cookies-from-browser",
       "chrome",
       "--cookie-url",
@@ -41,7 +39,6 @@ test("parseCli parses runtime browser-cookie config", () => {
     {
       mode: "run",
       headless: false,
-      engine: "patchright",
       browserCookies: {
         browser: "chrome",
         url: "https://x.com",
@@ -105,21 +102,10 @@ test("parseCli rejects --chrome-profile without --cookies-from-browser", () => {
   );
 });
 
-test("parseCli accepts an explicit playwright engine selection", () => {
-  assert.deepEqual(
-    parseCli(["node", "dist/main.js", "--engine", "playwright"]),
-    {
-      mode: "run",
-      headless: false,
-      engine: "playwright",
-    },
-  );
-});
-
-test("parseCli rejects unsupported engine values", () => {
+test("parseCli rejects the removed engine flag", () => {
   assert.throws(
-    () => parseCli(["node", "dist/main.js", "--engine", "selenium"]),
-    /unsupported engine/i,
+    () => parseCli(["node", "dist/main.js", "--engine", "patchright"]),
+    /unknown option|unknown command|too many arguments/i,
   );
 });
 
@@ -142,36 +128,6 @@ test("parseCli parses import-cookies mode", () => {
   );
 });
 
-test("parseCli parses config get engine mode", () => {
-  assert.deepEqual(
-    parseCli(["node", "dist/main.js", "config", "get", "engine"]),
-    {
-      mode: "config-get",
-      key: "engine",
-    },
-  );
-});
-
-test("parseCli parses config set engine mode", () => {
-  assert.deepEqual(
-    parseCli(["node", "dist/main.js", "config", "set", "engine", "patchright"]),
-    {
-      mode: "config-set",
-      key: "engine",
-      value: "patchright",
-    },
-  );
-});
-
-test("parseCli parses config path mode", () => {
-  assert.deepEqual(
-    parseCli(["node", "dist/main.js", "config", "path"]),
-    {
-      mode: "config-path",
-    },
-  );
-});
-
 test("parseCli rejects unsupported browser values for import-cookies", () => {
   assert.throws(
     () =>
@@ -188,26 +144,18 @@ test("parseCli rejects unsupported browser values for import-cookies", () => {
   );
 });
 
-test("parseCli rejects unsupported engine values for config set", () => {
+test("parseCli rejects the removed config command", () => {
   assert.throws(
-    () =>
-      parseCli([
-        "node",
-        "dist/main.js",
-        "config",
-        "set",
-        "engine",
-        "selenium",
-      ]),
-    /unsupported engine/i,
+    () => parseCli(["node", "dist/main.js", "config", "path"]),
+    /unknown command|too many arguments|unexpected/i,
   );
 });
 
 test("parseCli does not write Commander errors to stderr for run mode", () => {
-  const result = runNodeScript(`
-    const { parseCli } = require("./dist/cli.js");
+  const result = runBunScript(`
+    import { parseCli } from "./src/cli.ts";
     try {
-      parseCli(["node", "dist/main.js", "--cookie-url", "https://x.com"]);
+      parseCli(["bun", "src/main.ts", "--cookie-url", "https://x.com"]);
       process.exit(0);
     } catch {
       process.exit(1);
@@ -219,10 +167,10 @@ test("parseCli does not write Commander errors to stderr for run mode", () => {
 });
 
 test("parseCli does not write Commander errors to stderr for import-cookies mode", () => {
-  const result = runNodeScript(`
-    const { parseCli } = require("./dist/cli.js");
+  const result = runBunScript(`
+    import { parseCli } from "./src/cli.ts";
     try {
-      parseCli(["node", "dist/main.js", "import-cookies", "--browser", "chrome"]);
+      parseCli(["bun", "src/main.ts", "import-cookies", "--browser", "chrome"]);
       process.exit(0);
     } catch {
       process.exit(1);
@@ -389,8 +337,8 @@ test("parseCli rejects excess operands in import-cookies mode", () => {
   );
 });
 
-test("node dist/main.js --help exits cleanly with usage output", () => {
-  const result = spawnSync(process.execPath, ["dist/main.js", "--help"], {
+test("bun src/main.ts --help exits cleanly with go-style usage output", () => {
+  const result = spawnSync("bun", ["src/main.ts", "--help"], {
     cwd: process.cwd(),
     encoding: "utf8",
   });
@@ -398,5 +346,8 @@ test("node dist/main.js --help exits cleanly with usage output", () => {
   assert.equal(result.status, 0);
   assert.match(result.stdout, /Usage: hedlis/i);
   assert.match(result.stdout, /import-cookies/);
+  assert.match(result.stdout, /list-profiles/);
+  assert.match(result.stdout, /Examples:/);
+  assert.match(result.stdout, /required extension/i);
   assert.equal(result.stderr, "");
 });

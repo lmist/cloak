@@ -4,7 +4,6 @@ import { parseCli, isHeadlessEnabled, type RunModeConfig } from "./cli.js";
 import type { Cookie } from "./cookies.js";
 import { main, resolveStartupCookies } from "./main.js";
 import { CHROME_COOKIE_LIMITATION_WARNING } from "./chrome-cookies.js";
-import type { BrowserEngine } from "./config.js";
 
 test("startup defaults to headed mode", () => {
   assert.equal(isHeadlessEnabled(["node", "dist/main.js"]), false);
@@ -147,7 +146,7 @@ test("startup fails fast when browser cookies are explicitly requested but Chrom
 });
 
 test("main does not reach browser startup when explicit browser-cookie import returns none", async () => {
-  let prepareExtensionsCalls = 0;
+  let prepareRequiredExtensionCalls = 0;
   let launchCalls = 0;
 
   await assert.rejects(
@@ -163,9 +162,9 @@ test("main does not reach browser startup when explicit browser-cookie import re
       {
         loadCookies: async () => [cookie({ name: "disk", value: "1" })],
         readChromeCookies: async () => [],
-        prepareExtensions: async () => {
-          prepareExtensionsCalls += 1;
-          return [];
+        prepareRequiredExtension: async () => {
+          prepareRequiredExtensionCalls += 1;
+          return "/tmp/opencli-extension";
         },
         launchPersistentContext: async () => {
           launchCalls += 1;
@@ -176,7 +175,7 @@ test("main does not reach browser startup when explicit browser-cookie import re
     /No cookies found for https:\/\/x\.com/,
   );
 
-  assert.equal(prepareExtensionsCalls, 0);
+  assert.equal(prepareRequiredExtensionCalls, 0);
   assert.equal(launchCalls, 0);
 });
 
@@ -189,7 +188,7 @@ test("main honors an injected cookiesDir instead of resolving the working-direct
       seenCookiesDirs.push(cookiesDir);
       return [];
     },
-    prepareExtensions: async () => [],
+    prepareRequiredExtension: async () => "/tmp/opencli-extension",
     makeTempDir: () => "/tmp/vilnius-profile",
     makeDir: () => undefined,
     writeFile: () => undefined,
@@ -218,7 +217,7 @@ test("main adds the resolved merged cookie set to the browser context on success
         cookie({ name: "disk", value: "2" }),
         cookie({ name: "runtime", value: "3" }),
       ],
-      prepareExtensions: async () => [],
+      prepareRequiredExtension: async () => "/tmp/opencli-extension",
       makeTempDir: () => "/tmp/vilnius-profile",
       makeDir: () => undefined,
       writeFile: () => undefined,
@@ -232,13 +231,11 @@ test("main adds the resolved merged cookie set to the browser context on success
   ]]);
 });
 
-test("main preserves the chromium launch contract for headless startup", async () => {
+test("main uses the patchright launch contract for headless startup", async () => {
   const launchCalls: Array<{
-    engine: BrowserEngine;
     userDataDir: string;
     options: {
       headless: boolean;
-      channel?: "chromium";
       executablePath?: string;
       args: string[];
     };
@@ -247,36 +244,55 @@ test("main preserves the chromium launch contract for headless startup", async (
   await main(["node", "dist/main.js", "--headless"], {
     cookiesDir: "/tmp/injected-cookies",
     loadCookies: async () => [],
-    prepareExtensions: async () => [],
+    prepareRequiredExtension: async () => "/tmp/opencli-extension",
     makeTempDir: () => "/tmp/vilnius-profile",
     makeDir: () => undefined,
     writeFile: () => undefined,
-    playwrightLaunchPersistentContext: async (userDataDir, options) => {
-      launchCalls.push({ engine: "playwright", userDataDir, options });
+    patchrightExecutablePath: () => "/tmp/google-chrome-for-testing",
+    patchrightLaunchPersistentContext: async (userDataDir, options) => {
+      launchCalls.push({ userDataDir, options });
       return fakeContext();
     },
-    patchrightLaunchPersistentContext: async () => {
-      throw new Error("patchright launch should not be used");
-    },
-    readConfig: () => ({}),
   });
 
   assert.deepEqual(launchCalls, [
     {
-      engine: "playwright",
       userDataDir: "/tmp/vilnius-profile",
       options: {
         headless: true,
-        channel: "chromium",
-        args: [],
+        executablePath: "/tmp/google-chrome-for-testing",
+        args: [
+          "--disable-extensions-except=/tmp/opencli-extension",
+          "--load-extension=/tmp/opencli-extension",
+        ],
       },
     },
   ]);
 });
 
-test("main uses the configured patchright engine when no CLI engine override is present", async () => {
+test("main fails before browser launch when required extension bootstrap fails", async () => {
+  let launchCalls = 0;
+
+  await assert.rejects(
+    main(["node", "dist/main.js"], {
+      cookiesDir: "/tmp/injected-cookies",
+      loadCookies: async () => [],
+      prepareRequiredExtension: async () => {
+        throw new Error("extension download failed");
+      },
+      launchPersistentContext: async () => {
+        launchCalls += 1;
+        throw new Error("launch should not be called");
+      },
+    }),
+    /extension download failed/,
+  );
+
+  assert.equal(launchCalls, 0);
+});
+
+test("main uses patchright by default", async () => {
   const launchCalls: Array<{
-    engine: BrowserEngine;
     userDataDir: string;
     options: {
       headless: boolean;
@@ -289,35 +305,33 @@ test("main uses the configured patchright engine when no CLI engine override is 
   await main(["node", "dist/main.js"], {
     cookiesDir: "/tmp/injected-cookies",
     loadCookies: async () => [],
-    prepareExtensions: async () => [],
+    prepareRequiredExtension: async () => "/tmp/opencli-extension",
     makeTempDir: () => "/tmp/vilnius-profile",
     makeDir: () => undefined,
     writeFile: () => undefined,
-    readConfig: () => ({ engine: "patchright" }),
     patchrightExecutablePath: () => "/tmp/google-chrome-for-testing",
-    playwrightLaunchPersistentContext: async () => {
-      throw new Error("playwright launch should not be used");
-    },
     patchrightLaunchPersistentContext: async (userDataDir, options) => {
-      launchCalls.push({ engine: "patchright", userDataDir, options });
+      launchCalls.push({ userDataDir, options });
       return fakeContext();
     },
   });
 
   assert.deepEqual(launchCalls, [
     {
-      engine: "patchright",
       userDataDir: "/tmp/vilnius-profile",
       options: {
         headless: false,
         executablePath: "/tmp/google-chrome-for-testing",
-        args: [],
+        args: [
+          "--disable-extensions-except=/tmp/opencli-extension",
+          "--load-extension=/tmp/opencli-extension",
+        ],
       },
     },
   ]);
 });
 
-test("main preserves extension loading args for the patchright engine", async () => {
+test("main preserves extension loading args for the required extension", async () => {
   const launchCalls: Array<{
     options: {
       headless: boolean;
@@ -330,11 +344,10 @@ test("main preserves extension loading args for the patchright engine", async ()
   await main(["node", "dist/main.js"], {
     cookiesDir: "/tmp/injected-cookies",
     loadCookies: async () => [],
-    prepareExtensions: async () => ["/tmp/ext-a", "/tmp/ext-b"],
+    prepareRequiredExtension: async () => "/tmp/ext-a",
     makeTempDir: () => "/tmp/vilnius-profile",
     makeDir: () => undefined,
     writeFile: () => undefined,
-    readConfig: () => ({ engine: "patchright" }),
     patchrightExecutablePath: () => "/tmp/google-chrome-for-testing",
     patchrightLaunchPersistentContext: async (_userDataDir, options) => {
       launchCalls.push({ options });
@@ -348,35 +361,12 @@ test("main preserves extension loading args for the patchright engine", async ()
         headless: false,
         executablePath: "/tmp/google-chrome-for-testing",
         args: [
-          "--disable-extensions-except=/tmp/ext-a,/tmp/ext-b",
-          "--load-extension=/tmp/ext-a,/tmp/ext-b",
+          "--disable-extensions-except=/tmp/ext-a",
+          "--load-extension=/tmp/ext-a",
         ],
       },
     },
   ]);
-});
-
-test("main lets the CLI engine override the configured default engine", async () => {
-  const launchCalls: BrowserEngine[] = [];
-
-  await main(["node", "dist/main.js", "--engine", "playwright"], {
-    cookiesDir: "/tmp/injected-cookies",
-    loadCookies: async () => [],
-    prepareExtensions: async () => [],
-    makeTempDir: () => "/tmp/vilnius-profile",
-    makeDir: () => undefined,
-    writeFile: () => undefined,
-    readConfig: () => ({ engine: "patchright" }),
-    playwrightLaunchPersistentContext: async () => {
-      launchCalls.push("playwright");
-      return fakeContext();
-    },
-    patchrightLaunchPersistentContext: async () => {
-      throw new Error("patchright launch should not be used");
-    },
-  });
-
-  assert.deepEqual(launchCalls, ["playwright"]);
 });
 
 test("main removes SIGINT and SIGTERM listeners before returning", async () => {
@@ -387,7 +377,7 @@ test("main removes SIGINT and SIGTERM listeners before returning", async () => {
     await main(["node", "dist/main.js"], {
       cookiesDir: "/tmp/injected-cookies",
       loadCookies: async () => [],
-      prepareExtensions: async () => [],
+      prepareRequiredExtension: async () => "/tmp/opencli-extension",
       makeTempDir: () => "/tmp/vilnius-profile",
       makeDir: () => undefined,
       writeFile: () => undefined,

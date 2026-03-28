@@ -1,27 +1,31 @@
 {
   "name": "hedlis",
   "version": "1.0.0",
-  "description": "Browser runner with extension and cookie support",
+  "description": "Patchright runner with required OpenCLI extension and Chrome cookie support",
+  "packageManager": "bun@1.3.8",
   "bin": {
-    "hedlis": "dist/main.js"
+    "hedlis": "src/main.ts"
   },
   "files": [
-    "dist",
+    "src",
     "README.md",
     "usage.md"
   ],
   "scripts": {
-    "build": "tsc && chmod +x dist/main.js",
-    "start": "tsc && node dist/main.js",
-    "test": "tsc && node --test dist/*.test.js"
+    "postinstall": "bun run src/install-extension.ts",
+    "build": "bun build --compile --outfile dist/hedlis -e electron -e 'chromium-bidi/*' src/main.ts",
+    "typecheck": "bunx tsc --noEmit",
+    "start": "bun run src/main.ts",
+    "test": "bun test"
   },
   "dependencies": {
+    "adm-zip": "^0.5.16",
     "chrome-cookies-secure": "^3.0.1",
     "commander": "^12.1.0",
-    "patchright": "^1.58.2",
-    "playwright": "^1.40.0"
+    "patchright": "^1.58.2"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
     "@types/node": "^20.0.0",
     "typescript": "^5.3.0"
   }

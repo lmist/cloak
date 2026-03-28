@@ -1,10 +1,8 @@
 import { Command } from "commander";
-import { parseEngine, type BrowserEngine } from "./config.js";
 
 export type RunModeConfig = {
   mode: "run";
   headless: boolean;
-  engine?: BrowserEngine;
   browserCookies?: {
     browser: "chrome";
     url: string;
@@ -20,32 +18,11 @@ export type ImportCookiesConfig = {
   output?: string;
 };
 
-export type ConfigGetMode = {
-  mode: "config-get";
-  key: "engine";
-};
-
-export type ConfigSetMode = {
-  mode: "config-set";
-  key: "engine";
-  value: BrowserEngine;
-};
-
-export type ConfigPathMode = {
-  mode: "config-path";
-};
-
 export type ListProfilesMode = {
   mode: "list-profiles";
 };
 
-export type CliConfig =
-  | RunModeConfig
-  | ImportCookiesConfig
-  | ConfigGetMode
-  | ConfigSetMode
-  | ConfigPathMode
-  | ListProfilesMode;
+export type CliConfig = RunModeConfig | ImportCookiesConfig | ListProfilesMode;
 
 function parseChromeBrowser(value: string): "chrome" {
   if (value !== "chrome") {
@@ -53,14 +30,6 @@ function parseChromeBrowser(value: string): "chrome" {
   }
 
   return "chrome";
-}
-
-function parseConfigKey(value: string): "engine" {
-  if (value !== "engine") {
-    throw new Error(`unsupported config key: ${value}`);
-  }
-
-  return value;
 }
 
 function parseUrl(value: string): string {
@@ -85,6 +54,7 @@ function addImportCookiesCommand(program: Command): Command {
   const importCommand = silenceCommanderStderr(program.command("import-cookies"));
 
   importCommand
+    .summary("import Chrome cookies into cookies/")
     .requiredOption(
       "--browser <browser>",
       "browser to import cookies from (chrome only)",
@@ -104,16 +74,31 @@ function buildRunModeProgram() {
     .exitOverride()
     .allowUnknownOption(false)
     .allowExcessArguments(false)
+    .showHelpAfterError()
     .name("hedlis")
-    .option("--engine <engine>", "browser engine to use (playwright or patchright)", parseEngine)
-    .option("--headless", "run headless")
-    .option("--cookies-from-browser <browser>", "load cookies from Chrome", parseChromeBrowser)
+    .description("Launch Patchright with the required OpenCLI extension and optional Chrome cookies.")
+    .usage("[options] [command]")
+    .option("--headless", "run without opening a browser window")
+    .option("--cookies-from-browser <browser>", "load cookies from Chrome for this run", parseChromeBrowser)
     .option("--cookie-url <url>", "HTTP(S) site URL to scope Chrome cookies", parseUrl)
     .option("--chrome-profile <profile>", "Chrome profile name");
 
   program.addHelpText(
     "after",
-    "\nCommands:\n  import-cookies  import cookies from Chrome into cookies/\n  list-profiles   list available Chrome profiles\n  config          get or set persistent CLI defaults"
+    `
+Commands:
+  import-cookies  import cookies from Chrome into cookies/
+  list-profiles   list available Chrome profiles
+
+Examples:
+  hedlis --headless
+  hedlis --cookies-from-browser chrome --cookie-url https://x.com
+  hedlis import-cookies --browser chrome --url https://x.com --chrome-profile "Profile 2"
+
+Required extension:
+  hedlis always needs extensions/opencli-extension.zip. bun install fetches it,
+  and startup re-downloads it automatically if the archive is missing or invalid.
+`
   );
 
   return program;
@@ -126,47 +111,19 @@ function buildImportCookiesProgram() {
     .exitOverride()
     .allowUnknownOption(false)
     .allowExcessArguments(false)
-    .name("hedlis");
+    .showHelpAfterError()
+    .name("hedlis")
+    .description("Import Chrome cookies into cookies/ for repeatable hedlis runs.");
 
   const importCommand = addImportCookiesCommand(program);
 
   return { program, importCommand };
 }
 
-function parseConfigMode(argv: string[]): ConfigGetMode | ConfigSetMode | ConfigPathMode {
-  const args = argv.slice(2);
-
-  if (args[0] !== "config") {
-    throw new Error("config mode requires the config subcommand");
-  }
-
-  if (args[1] === "path" && args.length === 2) {
-    return { mode: "config-path" };
-  }
-
-  if (args[1] === "get" && args.length === 3) {
-    return {
-      mode: "config-get",
-      key: parseConfigKey(args[2]),
-    };
-  }
-
-  if (args[1] === "set" && args.length === 4) {
-    return {
-      mode: "config-set",
-      key: parseConfigKey(args[2]),
-      value: parseEngine(args[3]),
-    };
-  }
-
-  throw new Error("usage: hedlis config <get|set|path> ...");
-}
-
 function parseRunMode(argv: string[]): RunModeConfig {
   const program = buildRunModeProgram();
 
   const options = program.parse(argv, { from: "node" }).opts<{
-    engine?: BrowserEngine;
     headless?: boolean;
     cookiesFromBrowser?: "chrome";
     cookieUrl?: string;
@@ -193,18 +150,16 @@ function parseRunMode(argv: string[]): RunModeConfig {
     ? {
         mode: "run",
         headless: Boolean(options.headless),
-        ...(options.engine ? { engine: options.engine } : {}),
         browserCookies,
       }
     : {
         mode: "run",
         headless: Boolean(options.headless),
-        ...(options.engine ? { engine: options.engine } : {}),
       };
 }
 
 function parseImportCookiesMode(argv: string[]): ImportCookiesConfig {
-  const { program, importCommand } = buildImportCookiesProgram();
+  const { program } = buildImportCookiesProgram();
 
   const parsed = program.parse(argv, { from: "node" });
   const parsedImportCommand = parsed.commands[0];
@@ -235,7 +190,7 @@ export function parseCli(argv: string[]): CliConfig {
   }
 
   if (argv.slice(2)[0] === "config") {
-    return parseConfigMode(argv);
+    throw new Error("unknown command: config");
   }
 
   if (argv.slice(2)[0] === "list-profiles") {
