@@ -5,9 +5,13 @@
   "bin": {
     "hedlis": "dist/main.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "usage.md"
+  ],
   "scripts": {
-    "build": "tsc",
-    "prepare": "npm run build",
+    "build": "tsc && chmod +x dist/main.js",
     "start": "tsc && node dist/main.js",
     "test": "tsc && node --test dist/*.test.js"
   },
