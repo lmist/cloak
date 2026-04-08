@@ -1,0 +1,9 @@
+.env
+.context/
+.worktrees/
+node_modules/
+dist/
+.DS_Store
+*.crx
+cookies/
+extensions/

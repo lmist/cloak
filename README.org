@@ -1,0 +1,123 @@
+#+title: cloak
+
+1. Clone
+
+#+begin_src bash
+git clone https://github.com/lmist/cloak.git
+cd cloak
+#+end_src
+
+2. Install
+
+#+begin_src bash
+npm install -g @jackwener/opencli
+npx skills add jackwener/opencli
+npm install
+npx patchright install chromium
+npm run build
+#+end_src
+
+=cloak= is a companion to [[https://github.com/jackwener/opencli][OpenCLI]], so installing OpenCLI first is part of the normal setup.
+
+The OpenCLI skills are worth installing for Claude Code or Cursor. They give the agent the right language and workflows to use OpenCLI well, adapt to new requests, and build or refine adapters instead of treating every site or task as a one-off.
+
+During =npm install=, =cloak= asks for consent before creating =~/.config/cloak=. If you answer yes, it prepares:
+
+- =~/.config/cloak/cookies/=
+- =~/.config/cloak/extensions/=
+
+and downloads the pinned OpenCLI extension archive there so the CLI is ready to run.
+
+If install is non-interactive, =cloak= skips that bootstrap step and finishes setup later when you run it.
+
+3. =cloak profiles list=
+
+#+begin_src bash
+cloak profiles list
+#+end_src
+
+Typical output:
+
+#+begin_example
+Default: Personal
+Profile 1: Work
+Profile 3: Throwaway
+#+end_example
+
+4. Example: =cloak cookies import --browser chrome --url https://x.com --chrome-profile "Default"=
+
+#+begin_src bash
+cloak cookies import --browser chrome --url https://x.com --chrome-profile "Default"
+#+end_src
+
+This writes the imported cookies to =~/.config/cloak/cookies/x.com.json= by default.
+
+5. =cloak run=
+
+#+begin_src bash
+cloak run
+#+end_src
+
+* What cloak is
+
+=cloak= is a companion CLI for [[https://github.com/jackwener/opencli][OpenCLI]], powered by [[https://github.com/Kaliiiiiiiiii-Vinyzu/patchright/][Patchright]], and it always loads the pinned [[https://github.com/jackwener/opencli/releases/download/v1.6.8/opencli-extension.zip][OpenCLI extension archive]].
+
+The job is simple:
+
+- keep the automation browser headless unless you explicitly ask for a window
+- let you copy cookies out of your own Chrome profile
+- give OpenCLI a clean browser context that is not your day-to-day visible browser
+
+If you want a visible browser window instead of headless mode:
+
+#+begin_src bash
+cloak run --window
+cloak run -w
+#+end_src
+
+For local development:
+
+#+begin_src bash
+npm test
+npm run typecheck
+#+end_src
+
+* Storage
+
+Persistent state lives in:
+
+- =~/.config/cloak/cookies/=
+- =~/.config/cloak/extensions/=
+
+Specifically:
+
+- imported cookies go into =~/.config/cloak/cookies/=
+- the pinned OpenCLI extension archive lives at =~/.config/cloak/extensions/opencli-extension.zip=
+- the extracted extension directory and the Patchright user profile are created in the OS temp directory for each run
+
+* Extension bootstrap
+
+=cloak= uses a package postinstall step plus a runtime repair check.
+
+At install time, =src/install-extension.ts= ensures the pinned OpenCLI extension archive exists at:
+
+#+begin_example
+~/.config/cloak/extensions/opencli-extension.zip
+#+end_example
+
+At runtime, =cloak run= validates that archive again before Patchright starts. If the file is missing or invalid, it re-downloads it and only then launches the browser with:
+
+- =--disable-extensions-except=<extracted-extension-dir>=
+- =--load-extension=<extracted-extension-dir>=
+
+* Cookie flow
+
+=cloak cookies import= reads Chrome cookies for the exact site URL you pass in, scoped to the Chrome profile you name, normalizes them for Patchright or Playwright-style injection, and writes them into =~/.config/cloak/cookies/<hostname>.json= by default.
+
+=cloak run= then loads every =.json= file in =~/.config/cloak/cookies/= and injects the combined set into the automation browser before startup.
+
+If you use =cloak run --cookies-from-browser chrome --cookie-url https://x.com --chrome-profile "Default"=, it skips the disk write and pulls scoped Chrome cookies for that run only.
+
+* One sharp edge
+
+Chrome cookie extraction depends on =chrome-cookies-secure=, and that tool can collapse same-name cookies across different paths or subdomains before =cloak= sees them. If a login still fails after import, that is the first thing to suspect.
