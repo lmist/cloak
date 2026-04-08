@@ -1,5 +1,28 @@
 #+title: cloak
 
+<p align="center">
+  <img src="docs/assets/cloak-logo.png" alt="Cloak logo" width="180" />
+</p>
+
+<p align="center">
+  <img alt="Version" src="https://img.shields.io/github/package-json/v/lmist/cloak?filename=package.json&amp;label=version" />
+  <a href="https://github.com/lmist/cloak/actions/workflows/ci.yml">
+    <img alt="CI" src="https://github.com/lmist/cloak/actions/workflows/ci.yml/badge.svg?branch=main" />
+  </a>
+  <img alt="Node.js &gt;= 20" src="https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&amp;logoColor=white" />
+  <img alt="Built with TypeScript" src="https://img.shields.io/badge/built%20with-TypeScript-3178C6?logo=typescript&amp;logoColor=white" />
+  <a href="https://github.com/jackwener/opencli/releases/download/v1.6.8/opencli-extension.zip">
+    <img alt="OpenCLI extension v1.6.8" src="https://img.shields.io/badge/OpenCLI%20extension-v1.6.8-2563eb" />
+  </a>
+  <img alt="Makefile" src="https://img.shields.io/badge/tasks-Makefile-065f46" />
+  <a href="https://github.com/casey/just">
+    <img alt="Justfile" src="https://img.shields.io/badge/tasks-Justfile-0f172a" />
+  </a>
+  <a href="https://github.com/jackwener/opencli">
+    <img alt="OpenCLI companion" src="https://img.shields.io/badge/OpenCLI-companion-111827" />
+  </a>
+</p>
+
 1. Clone
 
 #+begin_src bash
@@ -80,6 +103,8 @@ For local development:
 #+begin_src bash
 npm test
 npm run typecheck
+make ci
+just ci
 #+end_src
 
 * Storage

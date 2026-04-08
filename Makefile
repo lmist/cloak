@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help install browser test typecheck build run cli-help binary-help clean
+.PHONY: help install browser test typecheck build ci run cli-help binary-help clean
 
 help:
 	@printf '%s\n' \
@@ -10,6 +10,7 @@ help:
 		'  make test         - run npm test' \
 		'  make typecheck    - run tsc --noEmit' \
 		'  make build        - build dist/' \
+		'  make ci           - run test, typecheck, and build' \
 		'  make run          - run the CLI from source' \
 		'  make cli-help     - show source CLI help' \
 		'  make binary-help  - show the built CLI help' \
@@ -28,6 +29,11 @@ typecheck:
 	npm run typecheck
 
 build:
+	npm run build
+
+ci:
+	npm test
+	npm run typecheck
 	npm run build
 
 run:
