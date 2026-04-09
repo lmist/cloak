@@ -1,7 +1,7 @@
 #+title: cloak
 #+property: header-args:sh :results output verbatim :exports code
 
-[[docs/assets/cloak-logo.png]]
+[[docs/assets/cloak-logo-readme.png]]
 
 * what it is
 
@@ -21,6 +21,8 @@ What stays ephemeral:
 
 If you are using =cloak= as the browser sidecar for [[https://github.com/jackwener/opencli][OpenCLI]], install OpenCLI separately. =cloak= itself does not need the OpenCLI CLI in order to launch.
 
+Chrome cookie import is an optional runtime feature. The base install should still work even if the native dependency chain behind Chrome cookie access does not install cleanly on a given machine.
+
 * prerequisites
 
 - Node.js 20 or newer
@@ -31,16 +33,18 @@ If you are using =cloak= as the browser sidecar for [[https://github.com/jackwen
 
 * install
 
-Install =cloak= directly from GitHub and verify the CLI:
+Once the npm release is live, install =cloak= globally and verify the CLI:
 
-#+name: install-from-github
+#+name: install-from-npm
 #+begin_src sh
 set -euo pipefail
 
-npm install -g github:lmist/cloak
+npm install -g cloak
 npx patchright install chromium
 cloak --help
 #+end_src
+
+Until the npm release is live, use the =from source= section below.
 
 If you use OpenCLI with it, install that separately:
 
@@ -182,3 +186,5 @@ fi
 * one sharp edge
 
 Chrome cookie extraction depends on =chrome-cookies-secure=, and that tool can collapse same-name cookies across different paths or subdomains before =cloak= sees them. If a login still fails after injection, that is the first thing to suspect.
+
+If =cloak run --cookies-from-browser chrome= tells you Chrome cookie support is unavailable, reinstall in an environment where the optional native dependency chain can be built successfully.

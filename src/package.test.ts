@@ -16,6 +16,7 @@ test("package metadata exposes the cloak binary", () => {
     scripts?: Record<string, string>;
     dependencies?: Record<string, string>;
     devDependencies?: Record<string, string>;
+    optionalDependencies?: Record<string, string>;
   };
 
   assert.equal(packageJson.name, "cloak");
@@ -27,7 +28,17 @@ test("package metadata exposes the cloak binary", () => {
     "bin",
     "dist",
     "scripts/postinstall.cjs",
-    "src",
+    "src/app-paths.ts",
+    "src/chrome-cookies.ts",
+    "src/chrome-profile-sites.ts",
+    "src/chrome-profiles.ts",
+    "src/chrome-site-picker.ts",
+    "src/cli.ts",
+    "src/cookies.ts",
+    "src/extension.ts",
+    "src/install-extension.ts",
+    "src/main.ts",
+    "src/output.ts",
     "README.org",
   ]);
   assert.equal(packageJson.scripts?.postinstall, "node scripts/postinstall.cjs");
@@ -48,6 +59,8 @@ test("package metadata exposes the cloak binary", () => {
   assert.ok(packageJson.dependencies?.tsx);
   assert.ok(packageJson.dependencies?.chalk);
   assert.ok(packageJson.dependencies?.yargs);
+  assert.equal(packageJson.dependencies?.["chrome-cookies-secure"], undefined);
+  assert.ok(packageJson.optionalDependencies?.["chrome-cookies-secure"]);
   assert.ok(packageJson.devDependencies?.typescript);
   assert.ok(packageJson.devDependencies?.["@types/node"]);
   assert.equal(packageJson.dependencies?.commander, undefined);
@@ -84,6 +97,7 @@ test("package tarball includes the built node entrypoint", () => {
   assert.ok(packedPaths.includes("dist/main.js"));
   assert.ok(packedPaths.includes("scripts/postinstall.cjs"));
   assert.ok(packedPaths.includes("src/main.ts"));
+  assert.ok(!packedPaths.includes("src/package.test.ts"));
 });
 
 test("readme documents the current Node workflow and CLI surface", () => {
@@ -97,7 +111,7 @@ test("readme documents the current Node workflow and CLI surface", () => {
   assert.match(readme, /^\* from source$/m);
   assert.match(readme, /^\* setup and usage$/m);
   assert.match(readme, /^\* one sharp edge$/m);
-  assert.match(readme, /npm install -g github:lmist\/cloak/);
+  assert.match(readme, /npm install -g cloak/);
   assert.match(readme, /git clone https:\/\/github\.com\/lmist\/cloak\.git/);
   assert.match(readme, /npm install/);
   assert.match(readme, /npx patchright install chromium/);

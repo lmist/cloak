@@ -12,7 +12,17 @@
     "bin",
     "dist",
     "scripts/postinstall.cjs",
-    "src",
+    "src/app-paths.ts",
+    "src/chrome-cookies.ts",
+    "src/chrome-profile-sites.ts",
+    "src/chrome-profiles.ts",
+    "src/chrome-site-picker.ts",
+    "src/cli.ts",
+    "src/cookies.ts",
+    "src/extension.ts",
+    "src/install-extension.ts",
+    "src/main.ts",
+    "src/output.ts",
     "README.org"
   ],
   "scripts": {
@@ -26,10 +36,12 @@
   "dependencies": {
     "adm-zip": "^0.5.16",
     "chalk": "^4.1.2",
-    "chrome-cookies-secure": "^3.0.1",
     "patchright": "^1.58.2",
     "tsx": "^4.21.0",
     "yargs": "^17.7.2"
+  },
+  "optionalDependencies": {
+    "chrome-cookies-secure": "^3.0.1"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.7",

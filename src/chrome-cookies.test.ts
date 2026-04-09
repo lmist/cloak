@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import path from "node:path";
 import {
-  defaultCookieOutputPath,
+  CHROME_COOKIE_SUPPORT_MISSING_ERROR,
+  coerceChromeCookieSupportError,
   readChromeCookies,
 } from "./chrome-cookies.js";
 
@@ -91,11 +91,18 @@ test("readChromeCookies normalizes persistent, expired, and session puppeteer co
   ]);
 });
 
-test("defaultCookieOutputPath strips the port and lowercases the hostname", () => {
-  const outputPath = defaultCookieOutputPath(
-    "https://X.com:443/path",
-    "/tmp/cookies"
+test("coerceChromeCookieSupportError turns missing optional dependency errors into a clear message", () => {
+  const error = coerceChromeCookieSupportError(
+    Object.assign(new Error("missing"), { code: "MODULE_NOT_FOUND" })
   );
 
-  assert.equal(outputPath, path.join("/tmp/cookies", "x.com.json"));
+  assert.equal(error?.message, CHROME_COOKIE_SUPPORT_MISSING_ERROR);
+});
+
+test("coerceChromeCookieSupportError ignores unrelated errors", () => {
+  const error = coerceChromeCookieSupportError(
+    Object.assign(new Error("boom"), { code: "EACCES" })
+  );
+
+  assert.equal(error, undefined);
 });
