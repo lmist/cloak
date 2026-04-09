@@ -2,6 +2,7 @@
   "name": "@lmist/cloak",
   "version": "1.1.0",
   "description": "Browser sidecar for OpenCLI with the required extension and Chrome cookie support",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/lmist/cloak"

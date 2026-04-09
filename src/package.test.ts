@@ -10,6 +10,7 @@ test("package metadata exposes the cloak binary", () => {
     fs.readFileSync(path.resolve("package.json"), "utf8"),
   ) as {
     name?: string;
+    license?: string;
     engines?: Record<string, string>;
     repository?: { type?: string; url?: string };
     bin?: Record<string, string>;
@@ -22,6 +23,7 @@ test("package metadata exposes the cloak binary", () => {
   };
 
   assert.equal(packageJson.name, "@lmist/cloak");
+  assert.equal(packageJson.license, "MIT");
   assert.deepEqual(packageJson.repository, {
     type: "git",
     url: "https://github.com/lmist/cloak",
