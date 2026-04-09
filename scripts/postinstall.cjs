@@ -14,7 +14,14 @@ const args = existsSync(sourceEntrypoint) && existsSync(tsxEntrypoint)
   ? ["--import", "tsx", sourceEntrypoint]
   : [distEntrypoint];
 
-execFileSync(command, args, {
-  cwd: rootDir,
-  stdio: "inherit",
-});
+try {
+  execFileSync(command, args, {
+    cwd: rootDir,
+    stdio: "inherit",
+  });
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  console.warn(
+    `[cloak] Warning: failed to warm the OpenCLI extension cache during postinstall. cloak will retry at runtime. (${message})`
+  );
+}
