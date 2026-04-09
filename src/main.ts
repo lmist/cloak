@@ -5,19 +5,20 @@ import os from "node:os";
 import fs from "node:fs";
 import { resolveAppPaths, type AppPaths } from "./app-paths.js";
 import { prepareRequiredExtension } from "./extension.js";
-import { loadCookies, mergeCookies, type Cookie } from "./cookies.js";
+import type { Cookie } from "./cookies.js";
 import { parseCli, type RunModeConfig } from "./cli.js";
-import { importCookiesCommand } from "./import-cookies.js";
 import {
   CHROME_COOKIE_LIMITATION_WARNING,
   readChromeCookies,
 } from "./chrome-cookies.js";
-import { listChromeProfiles } from "./chrome-profiles.js";
+import {
+  formatChromeProfileSitesReport,
+  listChromeProfileSites,
+} from "./chrome-profile-sites.js";
+import { runChromeSitePicker } from "./chrome-site-picker.js";
 import { formatError, formatInfo, formatSuccess, formatWarning } from "./output.js";
 
 type ResolveStartupCookiesDependencies = {
-  cookiesDir?: string;
-  loadCookies?: typeof loadCookies;
   readChromeCookies?: typeof readChromeCookies;
   warn?: (message: string) => void;
 };
@@ -38,6 +39,8 @@ type LaunchOptions = {
 type MainDependencies = ResolveStartupCookiesDependencies & {
   appPaths?: AppPaths;
   prepareRequiredExtension?: typeof prepareRequiredExtension;
+  listChromeProfileSites?: typeof listChromeProfileSites;
+  selectChromeSite?: typeof runChromeSitePicker;
   launchPersistentContext?: (
     userDataDir: string,
     options: LaunchOptions
@@ -51,35 +54,39 @@ type MainDependencies = ResolveStartupCookiesDependencies & {
   makeDir?: (path: string, options: { recursive: true }) => void;
   writeFile?: (path: string, data: string) => void;
   writeStdout?: (message: string) => void;
+  stdinIsTTY?: boolean;
+  stdoutIsTTY?: boolean;
 };
 
 export async function resolveStartupCookies(
   cli: RunModeConfig,
   dependencies: ResolveStartupCookiesDependencies = {}
 ): Promise<Cookie[]> {
-  const cookiesDir = dependencies.cookiesDir ?? resolveAppPaths().cookiesDir;
-  const loadCookiesFn = dependencies.loadCookies ?? loadCookies;
-  const diskCookies = await loadCookiesFn(cookiesDir);
-
   if (!cli.browserCookies) {
-    return diskCookies;
+    return [];
   }
 
   const readChromeCookiesFn =
     dependencies.readChromeCookies ?? readChromeCookies;
   const warn = dependencies.warn ?? ((message: string) => console.warn(formatWarning(message)));
+  const cookieUrl = cli.browserCookies.url;
+
+  if (!cookieUrl) {
+    throw new Error("Browser cookie URL must be resolved before startup.");
+  }
+
   const browserCookies = await readChromeCookiesFn({
-    url: cli.browserCookies.url,
+    url: cookieUrl,
     profile: cli.browserCookies.profile,
   });
 
   if (browserCookies.length === 0) {
-    throw new Error(`No cookies found for ${cli.browserCookies.url}`);
+    throw new Error(`No cookies found for ${cookieUrl}`);
   }
 
   warn(CHROME_COOKIE_LIMITATION_WARNING);
 
-  return mergeCookies(diskCookies, browserCookies);
+  return browserCookies;
 }
 
 export async function main(
@@ -97,34 +104,35 @@ export async function main(
   }
 
   if (cli.mode === "list-profiles") {
-    const profiles = listChromeProfiles();
+    const listProfileSites =
+      dependencies.listChromeProfileSites ?? listChromeProfileSites;
+    const selectChromeSite = dependencies.selectChromeSite ?? runChromeSitePicker;
+    const profiles = await listProfileSites();
+
+    if (!isInteractiveTerminal(dependencies)) {
+      writeStdout(formatChromeProfileSitesReport(profiles));
+      return;
+    }
+
     if (profiles.length === 0) {
       console.log(formatInfo("No Chrome profiles found."));
-    } else {
-      for (const profile of profiles) {
-        const label = profile.accountName ?? profile.name;
-        console.log(formatInfo(`${profile.directory}: ${label}`));
-      }
+      return;
     }
+
+    const selection = await selectChromeSite({ profiles });
+    if (selection) {
+      console.log(formatSuccess(`${selection.profile.directory}: ${selection.site.url}`));
+    }
+
     return;
   }
 
-  if (cli.mode === "import-cookies") {
-    const result = await importCookiesCommand({
-      url: cli.url,
-      profile: cli.profile,
-      output: cli.output,
-      cwd: process.cwd(),
-      cookiesDir: appPaths.cookiesDir,
-    });
-    console.log(formatSuccess(`Imported ${result.count} cookies to ${result.outputPath}`));
+  const resolvedCli = await resolveRunConfig(cli, dependencies);
+  if (!resolvedCli) {
     return;
   }
 
-  const cookiesDir = dependencies.cookiesDir ?? appPaths.cookiesDir;
-  const cookies = await resolveStartupCookies(cli, {
-    cookiesDir,
-    loadCookies: dependencies.loadCookies,
+  const cookies = await resolveStartupCookies(resolvedCli, {
     readChromeCookies: dependencies.readChromeCookies,
   });
   const prepareExtension =
@@ -157,7 +165,7 @@ export async function main(
     dependencies.patchrightExecutablePath ??
     patchrightChromium.executablePath.bind(patchrightChromium);
   const context = await launchPersistentContext(userDataDir, {
-    headless: cli.headless,
+    headless: resolvedCli.headless,
     executablePath: executablePath(),
     args,
   });
@@ -221,4 +229,80 @@ if (require.main === module) {
     console.error(formatError(String(error)));
     process.exit(1);
   });
+}
+
+async function resolveRunConfig(
+  cli: RunModeConfig,
+  dependencies: Pick<
+    MainDependencies,
+    "listChromeProfileSites" | "selectChromeSite" | "stdinIsTTY" | "stdoutIsTTY"
+  >
+): Promise<RunModeConfig | undefined> {
+  if (!cli.browserCookies || cli.browserCookies.url) {
+    return cli;
+  }
+
+  if (!isInteractiveTerminal(dependencies)) {
+    throw new Error(
+      "--cookie-url is required when --cookies-from-browser is used outside an interactive terminal"
+    );
+  }
+
+  const listProfileSites =
+    dependencies.listChromeProfileSites ?? listChromeProfileSites;
+  const selectChromeSite = dependencies.selectChromeSite ?? runChromeSitePicker;
+  const profiles = (await listProfileSites()).filter((profile) => profile.sites.length > 0);
+
+  if (profiles.length === 0) {
+    throw new Error("No Chrome cookie-bearing sites found.");
+  }
+
+  const requestedProfile = cli.browserCookies.profile;
+  const initialProfile = requestedProfile
+    ? profiles.find((profile) => profile.directory === requestedProfile)
+    : profiles.length === 1
+      ? profiles[0]
+      : undefined;
+
+  if (requestedProfile && !initialProfile) {
+    throw new Error(`Chrome profile not found: ${requestedProfile}`);
+  }
+
+  if (initialProfile && initialProfile.sites.length === 1) {
+    return {
+      ...cli,
+      browserCookies: {
+        ...cli.browserCookies,
+        profile: initialProfile.directory,
+        url: initialProfile.sites[0].url,
+      },
+    };
+  }
+
+  const selection = await selectChromeSite({
+    profiles,
+    ...(initialProfile ? { initialProfileDirectory: initialProfile.directory } : {}),
+    ...(initialProfile ? { lockProfile: true } : {}),
+  });
+
+  if (!selection) {
+    return undefined;
+  }
+
+  return {
+    ...cli,
+    browserCookies: {
+      ...cli.browserCookies,
+      profile: selection.profile.directory,
+      url: selection.site.url,
+    },
+  };
+}
+
+function isInteractiveTerminal(
+  dependencies: Pick<MainDependencies, "stdinIsTTY" | "stdoutIsTTY">
+): boolean {
+  const stdinIsTTY = dependencies.stdinIsTTY ?? process.stdin.isTTY ?? false;
+  const stdoutIsTTY = dependencies.stdoutIsTTY ?? process.stdout.isTTY ?? false;
+  return stdinIsTTY && stdoutIsTTY;
 }

@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import AdmZip from "adm-zip";
-import { defaultAppRootDir, resolveAppPaths } from "./app-paths.js";
+import { defaultAppRootDir } from "./app-paths.js";
 import { formatInfo } from "./output.js";
 
 export const REQUIRED_EXTENSION_URL =
@@ -158,13 +158,10 @@ export async function prepareRequiredExtension(
 }
 
 export async function installRequiredExtension(
-  rootDir: string = defaultAppRootDir(),
+  extensionsDir: string = defaultAppRootDir(),
   dependencies: EnsureRequiredExtensionDependencies = {}
 ): Promise<string> {
-  return ensureRequiredExtensionArchive(
-    resolveAppPaths(rootDir).extensionsDir,
-    dependencies
-  );
+  return ensureRequiredExtensionArchive(extensionsDir, dependencies);
 }
 
 function normalizeZipEntryName(entryName: string): string {

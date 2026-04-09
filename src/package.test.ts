@@ -28,6 +28,7 @@ test("package metadata exposes the cloak binary", () => {
     "bin",
     "dist",
     "scripts/postinstall.cjs",
+    "docs/assets/cloak-logo-readme-centered.png",
     "src/app-paths.ts",
     "src/chrome-cookies.ts",
     "src/chrome-profile-sites.ts",
@@ -44,7 +45,7 @@ test("package metadata exposes the cloak binary", () => {
   assert.equal(packageJson.scripts?.postinstall, "node scripts/postinstall.cjs");
   assert.equal(
     packageJson.scripts?.build,
-    "node ./node_modules/typescript/bin/tsc --project tsconfig.build.json"
+    "node scripts/build.cjs"
   );
   assert.equal(packageJson.scripts?.prepare, undefined);
   assert.equal(packageJson.scripts?.prepack, "npm run build");
@@ -61,6 +62,7 @@ test("package metadata exposes the cloak binary", () => {
   assert.ok(packageJson.dependencies?.yargs);
   assert.equal(packageJson.dependencies?.["chrome-cookies-secure"], undefined);
   assert.ok(packageJson.optionalDependencies?.["chrome-cookies-secure"]);
+  assert.ok(packageJson.optionalDependencies?.sqlite3);
   assert.ok(packageJson.devDependencies?.typescript);
   assert.ok(packageJson.devDependencies?.["@types/node"]);
   assert.equal(packageJson.dependencies?.commander, undefined);
@@ -105,8 +107,11 @@ test("package tarball includes the built node entrypoint", () => {
 
   assert.ok(packedPaths.includes("bin/cloak.js"));
   assert.ok(packedPaths.includes("dist/main.js"));
+  assert.ok(packedPaths.includes("docs/assets/cloak-logo-readme-centered.png"));
   assert.ok(packedPaths.includes("scripts/postinstall.cjs"));
   assert.ok(packedPaths.includes("src/main.ts"));
+  assert.ok(!packedPaths.includes("dist/import-cookies.js"));
+  assert.ok(!packedPaths.includes("dist/install-bootstrap.js"));
   assert.ok(!packedPaths.includes("src/package.test.ts"));
 });
 

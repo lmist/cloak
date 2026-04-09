@@ -1,68 +1,48 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { loadCookies } from "./cookies.js";
+import { normalizeCookie } from "./cookies.js";
 
-test("loadCookies preserves Playwright-format cookies", async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vilnius-cookies-"));
-  const filePath = path.join(dir, "example.com.json");
+test("normalizeCookie preserves Playwright-format cookies", () => {
+  const source = {
+    name: "sessionid",
+    value: "abc",
+    domain: ".example.com",
+    path: "/",
+    httpOnly: true,
+    secure: true,
+    sameSite: "None" as const,
+    expires: 1798830478,
+  };
 
-  const source = [
-    {
-      name: "sessionid",
-      value: "abc",
-      domain: ".example.com",
-      path: "/",
-      httpOnly: true,
-      secure: true,
-      sameSite: "None",
-      expires: 1798830478,
-    },
-  ];
-
-  fs.writeFileSync(filePath, JSON.stringify(source));
-
-  const cookies = await loadCookies(dir);
-
-  assert.deepEqual(cookies, source);
+  assert.deepEqual(normalizeCookie(source), source);
 });
 
-test("loadCookies normalizes browser-export JSON cookies", async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vilnius-cookies-"));
-  const filePath = path.join(dir, "instagram.json");
-
-  fs.writeFileSync(
-    filePath,
-    JSON.stringify([
-      {
-        domain: ".instagram.com",
-        expirationDate: 1798830478.408272,
-        hostOnly: false,
-        httpOnly: true,
-        name: "mid",
-        path: "/",
-        sameSite: "no_restriction",
-        secure: true,
-        session: false,
-        storeId: "0",
-        value: "cookie-value",
-      },
-      {
-        domain: ".instagram.com",
-        httpOnly: true,
-        name: "csrftoken",
-        path: "/",
-        sameSite: "unspecified",
-        secure: true,
-        session: true,
-        value: "csrf-value",
-      },
-    ])
-  );
-
-  const cookies = await loadCookies(dir);
+test("normalizeCookie normalizes browser-export JSON cookies", () => {
+  const cookies = [
+    normalizeCookie({
+      domain: ".instagram.com",
+      expirationDate: 1798830478.408272,
+      hostOnly: false,
+      httpOnly: true,
+      name: "mid",
+      path: "/",
+      sameSite: "no_restriction",
+      secure: true,
+      session: false,
+      storeId: "0",
+      value: "cookie-value",
+    }),
+    normalizeCookie({
+      domain: ".instagram.com",
+      httpOnly: true,
+      name: "csrftoken",
+      path: "/",
+      sameSite: "unspecified",
+      secure: true,
+      session: true,
+      value: "csrf-value",
+    }),
+  ];
 
   assert.deepEqual(cookies, [
     {

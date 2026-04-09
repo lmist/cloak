@@ -14,7 +14,7 @@ type Dependencies = {
   readFile?: (path: string) => string;
 };
 
-function defaultChromeUserDataDir(): string {
+export function defaultChromeUserDataDir(): string {
   const platform = os.platform();
   const home = os.homedir();
 

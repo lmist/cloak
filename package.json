@@ -12,6 +12,7 @@
     "bin",
     "dist",
     "scripts/postinstall.cjs",
+    "docs/assets/cloak-logo-readme-centered.png",
     "src/app-paths.ts",
     "src/chrome-cookies.ts",
     "src/chrome-profile-sites.ts",
@@ -27,7 +28,7 @@
   ],
   "scripts": {
     "postinstall": "node scripts/postinstall.cjs",
-    "build": "node ./node_modules/typescript/bin/tsc --project tsconfig.build.json",
+    "build": "node scripts/build.cjs",
     "prepack": "npm run build",
     "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit",
     "start": "node --import tsx src/main.ts",
@@ -41,7 +42,8 @@
     "yargs": "^17.7.2"
   },
   "optionalDependencies": {
-    "chrome-cookies-secure": "^3.0.1"
+    "chrome-cookies-secure": "^3.0.1",
+    "sqlite3": "^5.1.7"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.7",

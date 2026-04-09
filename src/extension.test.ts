@@ -32,7 +32,7 @@ function createExtensionArchiveFixture() {
   return zip.toBuffer();
 }
 
-test("downloadRequiredExtensionArchive fetches the pinned extension asset into extensions/", async () => {
+test("downloadRequiredExtensionArchive fetches the pinned extension asset into the cache directory", async () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cloak-extension-"));
   const extensionsDir = path.join(tempRoot, "extensions");
   const fixture = createExtensionArchiveFixture();
@@ -128,13 +128,9 @@ test("validateExtensionArchive rejects a structurally valid archive with the wro
   );
 });
 
-test("installRequiredExtension stores the archive in the configured app-home extensions directory", async () => {
+test("installRequiredExtension stores the archive in the configured cache directory", async () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cloak-extension-"));
-  const expectedArchivePath = path.join(
-    tempRoot,
-    "extensions",
-    REQUIRED_EXTENSION_ARCHIVE_NAME
-  );
+  const expectedArchivePath = path.join(tempRoot, REQUIRED_EXTENSION_ARCHIVE_NAME);
   const seenExtensionsDirs: string[] = [];
 
   const archivePath = await installRequiredExtension(tempRoot, {
@@ -148,6 +144,6 @@ test("installRequiredExtension stores the archive in the configured app-home ext
     log: () => undefined,
   });
 
-  assert.deepEqual(seenExtensionsDirs, [path.join(tempRoot, "extensions")]);
+  assert.deepEqual(seenExtensionsDirs, [tempRoot]);
   assert.equal(archivePath, expectedArchivePath);
 });

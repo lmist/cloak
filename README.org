@@ -1,7 +1,7 @@
 #+title: cloak
 #+property: header-args:sh :results output verbatim :exports code
 
-[[docs/assets/cloak-logo-readme.png]]
+[[docs/assets/cloak-logo-readme-centered.png]]
 
 * what it is
 

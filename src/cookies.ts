@@ -1,7 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
-import { formatInfo } from "./output.js";
-
 export interface Cookie {
   name: string;
   value: string;
@@ -19,9 +15,12 @@ interface BrowserExportCookie {
   domain: string;
   path: string;
   expirationDate?: number;
+  hostOnly?: boolean;
   httpOnly?: boolean;
   secure?: boolean;
+  session?: boolean;
   sameSite?: string;
+  storeId?: string;
 }
 
 function normalizeSameSite(
@@ -75,54 +74,4 @@ export function normalizeCookie(raw: Cookie | BrowserExportCookie): Cookie {
   }
 
   return cookie;
-}
-
-function cookieIdentity(cookie: Cookie): string {
-  return `${cookie.name}\u0000${cookie.domain}\u0000${cookie.path}`;
-}
-
-export function mergeCookies(
-  diskCookies: Cookie[],
-  browserCookies: Cookie[]
-): Cookie[] {
-  const merged = new Map<string, Cookie>();
-
-  for (const cookie of diskCookies) {
-    merged.set(cookieIdentity(cookie), cookie);
-  }
-
-  for (const cookie of browserCookies) {
-    merged.set(cookieIdentity(cookie), cookie);
-  }
-
-  return [...merged.values()];
-}
-
-export async function loadCookies(cookiesDir: string): Promise<Cookie[]> {
-  if (!fs.existsSync(cookiesDir)) {
-    console.log(formatInfo("No cookies/ directory found"));
-    return [];
-  }
-
-  const files = fs
-    .readdirSync(cookiesDir)
-    .filter((f) => f.endsWith(".json"));
-
-  if (files.length === 0) {
-    console.log(formatInfo("No .json files in cookies/"));
-    return [];
-  }
-
-  const all: Cookie[] = [];
-
-  for (const file of files) {
-    const filePath = path.join(cookiesDir, file);
-    const raw = fs.readFileSync(filePath, "utf-8");
-    const parsed = JSON.parse(raw) as Array<Cookie | BrowserExportCookie>;
-    const cookies = parsed.map(normalizeCookie);
-    all.push(...cookies);
-    console.log(formatInfo(`Loaded ${cookies.length} cookies from ${file}`));
-  }
-
-  return all;
 }

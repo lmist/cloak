@@ -15,7 +15,7 @@ test("parseCli shows help mode with no arguments", () => {
 
   assert.equal(cli.mode, "help");
   assert.match(cli.text, /Usage:\s+cloak <command>/i);
-  assert.match(cli.text, /cookies import/i);
+  assert.doesNotMatch(cli.text, /cookies import/i);
   assert.match(cli.text, /profiles list/i);
 });
 
@@ -27,36 +27,35 @@ test("parseCli parses run mode with headless enabled by default", () => {
 });
 
 test("parseCli parses run mode with a visible browser window", () => {
+  assert.deepEqual(parseCli(["node", "dist/main.js", "run", "--window"]), {
+    mode: "run",
+    headless: false,
+  });
+});
+
+test("parseCli parses runtime browser-cookie config without requiring --cookie-url", () => {
   assert.deepEqual(
     parseCli([
       "node",
       "dist/main.js",
       "run",
-      "--window",
+      "--cookies-from-browser",
+      "chrome",
+      "--chrome-profile",
+      "Profile 2",
     ]),
     {
       mode: "run",
-      headless: false,
-    },
+      headless: true,
+      browserCookies: {
+        browser: "chrome",
+        profile: "Profile 2",
+      },
+    }
   );
 });
 
-test("parseCli parses the short -w alias for a visible browser window", () => {
-  assert.deepEqual(
-    parseCli([
-      "node",
-      "dist/main.js",
-      "run",
-      "-w",
-    ]),
-    {
-      mode: "run",
-      headless: false,
-    },
-  );
-});
-
-test("parseCli parses runtime browser-cookie config for run mode", () => {
+test("parseCli parses runtime browser-cookie config with an explicit URL", () => {
   assert.deepEqual(
     parseCli([
       "node",
@@ -77,7 +76,7 @@ test("parseCli parses runtime browser-cookie config for run mode", () => {
         url: "https://x.com",
         profile: "Profile 2",
       },
-    },
+    }
   );
 });
 
@@ -91,7 +90,7 @@ test("parseCli rejects --cookie-url without --cookies-from-browser", () => {
         "--cookie-url",
         "https://x.com",
       ]),
-    /cookies-from-browser/i,
+    /cookies-from-browser/i
   );
 });
 
@@ -105,7 +104,7 @@ test("parseCli rejects --cookie-url with a help token as its value", () => {
         "--cookie-url",
         "--help",
       ]),
-    /invalid url|invalid/i,
+    /invalid url|invalid/i
   );
 });
 
@@ -121,7 +120,7 @@ test("parseCli rejects non-http browser-cookie URLs", () => {
         "--cookie-url",
         "file:///tmp/cookies.txt",
       ]),
-    /invalid url/i,
+    /invalid url/i
   );
 });
 
@@ -135,14 +134,43 @@ test("parseCli rejects --chrome-profile without --cookies-from-browser", () => {
         "--chrome-profile",
         "Profile 2",
       ]),
-    /cookies-from-browser/i,
+    /cookies-from-browser/i
+  );
+});
+
+test("parseCli rejects unsupported browser values for runtime browser cookies", () => {
+  assert.throws(
+    () =>
+      parseCli([
+        "node",
+        "dist/main.js",
+        "run",
+        "--cookies-from-browser",
+        "firefox",
+      ]),
+    /unsupported browser/i
   );
 });
 
 test("parseCli rejects the removed --headless flag", () => {
   assert.throws(
     () => parseCli(["node", "dist/main.js", "run", "--headless"]),
-    /unknown|arguments/i,
+    /unknown|arguments/i
+  );
+});
+
+test("parseCli rejects the removed cookies import command", () => {
+  assert.throws(
+    () =>
+      parseCli([
+        "node",
+        "dist/main.js",
+        "cookies",
+        "import",
+        "--browser",
+        "chrome",
+      ]),
+    /unknown|arguments/i
   );
 });
 
@@ -155,51 +183,14 @@ test("parseCli rejects top-level run flags without the run subcommand", () => {
         "--cookies-from-browser",
         "chrome",
       ]),
-    /unknown|arguments/i,
-  );
-});
-
-test("parseCli parses cookies import mode", () => {
-  assert.deepEqual(
-    parseCli([
-      "node",
-      "dist/main.js",
-      "cookies",
-      "import",
-      "--browser",
-      "chrome",
-      "--url",
-      "https://x.com",
-    ]),
-    {
-      mode: "import-cookies",
-      browser: "chrome",
-      url: "https://x.com",
-    },
-  );
-});
-
-test("parseCli rejects unsupported browser values for cookies import", () => {
-  assert.throws(
-    () =>
-      parseCli([
-        "node",
-        "dist/main.js",
-        "cookies",
-        "import",
-        "--browser",
-        "firefox",
-        "--url",
-        "https://x.com",
-      ]),
-    /unsupported browser/i,
+    /unknown|arguments/i
   );
 });
 
 test("parseCli rejects the removed config command", () => {
   assert.throws(
     () => parseCli(["node", "dist/main.js", "config", "path"]),
-    /unknown command|unknown arguments|unknown/i,
+    /unknown command|unknown arguments|unknown/i
   );
 });
 
@@ -218,115 +209,6 @@ test("parseCli does not write yargs errors to stderr for run mode", () => {
   assert.equal(result.stderr, "");
 });
 
-test("parseCli does not write yargs errors to stderr for cookies import mode", () => {
-  const result = runInlineScript(`
-    const { parseCli } = require("./src/cli.ts");
-    try {
-      parseCli(["node", "src/main.ts", "cookies", "import", "--browser", "chrome"]);
-      process.exit(0);
-    } catch {
-      process.exit(1);
-    }
-  `);
-
-  assert.equal(result.status, 1);
-  assert.equal(result.stderr, "");
-});
-
-test("parseCli rejects unsupported browser values for runtime browser cookies", () => {
-  assert.throws(
-    () =>
-      parseCli([
-        "node",
-        "dist/main.js",
-        "run",
-        "--cookies-from-browser",
-        "firefox",
-        "--cookie-url",
-        "https://x.com",
-      ]),
-    /unsupported browser/i,
-  );
-});
-
-test("parseCli requires --cookie-url when --cookies-from-browser is used", () => {
-  assert.throws(
-    () =>
-      parseCli([
-        "node",
-        "dist/main.js",
-        "run",
-        "--cookies-from-browser",
-        "chrome",
-      ]),
-    /cookie-url/i,
-  );
-});
-
-test("parseCli requires --browser for cookies import", () => {
-  assert.throws(
-    () =>
-      parseCli([
-        "node",
-        "dist/main.js",
-        "cookies",
-        "import",
-        "--url",
-        "https://x.com",
-      ]),
-    /browser/i,
-  );
-});
-
-test("parseCli requires --url for cookies import", () => {
-  assert.throws(
-    () =>
-      parseCli([
-        "node",
-        "dist/main.js",
-        "cookies",
-        "import",
-        "--browser",
-        "chrome",
-      ]),
-    /url/i,
-  );
-});
-
-test("parseCli rejects --url with a help token as its value", () => {
-  assert.throws(
-    () =>
-      parseCli([
-        "node",
-        "dist/main.js",
-        "cookies",
-        "import",
-        "--browser",
-        "chrome",
-        "--url",
-        "--help",
-      ]),
-    /invalid url|invalid/i,
-  );
-});
-
-test("parseCli rejects non-http import URLs", () => {
-  assert.throws(
-    () =>
-      parseCli([
-        "node",
-        "dist/main.js",
-        "cookies",
-        "import",
-        "--browser",
-        "chrome",
-        "--url",
-        "chrome://settings",
-      ]),
-    /invalid url/i,
-  );
-});
-
 test("isHeadlessEnabled returns false for help mode", () => {
   assert.equal(isHeadlessEnabled(["node", "dist/main.js"]), false);
 });
@@ -339,74 +221,16 @@ test("isHeadlessEnabled returns false when run mode uses --window", () => {
   assert.equal(isHeadlessEnabled(["node", "dist/main.js", "run", "--window"]), false);
 });
 
-test("isHeadlessEnabled returns false for valid cookies import invocations", () => {
-  assert.equal(
-    isHeadlessEnabled([
-      "node",
-      "dist/main.js",
-      "cookies",
-      "import",
-      "--browser",
-      "chrome",
-      "--url",
-      "https://x.com",
-    ]),
-    false,
-  );
-});
-
-test("isHeadlessEnabled validates cookies import invocations through parseCli", () => {
-  assert.throws(
-    () => isHeadlessEnabled(["node", "dist/main.js", "cookies", "import"]),
-    /required/i,
-  );
-});
-
-test("parseCli rejects cookies import as a chrome profile value without browser cookies", () => {
-  assert.throws(
-    () =>
-      parseCli([
-        "node",
-        "dist/main.js",
-        "run",
-        "--chrome-profile",
-        "cookies",
-      ]),
-    /cookies-from-browser/i,
-  );
-});
-
 test("parseCli parses profiles list mode", () => {
-  assert.deepEqual(
-    parseCli(["node", "dist/main.js", "profiles", "list"]),
-    {
-      mode: "list-profiles",
-    },
-  );
+  assert.deepEqual(parseCli(["node", "dist/main.js", "profiles", "list"]), {
+    mode: "list-profiles",
+  });
 });
 
 test("parseCli rejects stray positional operands in run mode", () => {
   assert.throws(
     () => parseCli(["node", "dist/main.js", "run", "foo"]),
-    /unknown|arguments/i,
-  );
-});
-
-test("parseCli rejects excess operands in cookies import mode", () => {
-  assert.throws(
-    () =>
-      parseCli([
-        "node",
-        "dist/main.js",
-        "cookies",
-        "import",
-        "foo",
-        "--browser",
-        "chrome",
-        "--url",
-        "https://x.com",
-      ]),
-    /unknown|arguments/i,
+    /unknown|arguments/i
   );
 });
 
@@ -419,7 +243,7 @@ test("node --import tsx src/main.ts exits cleanly with cloak usage output", () =
   assert.equal(result.status, 0);
   assert.match(result.stdout, /Usage:\s+cloak/i);
   assert.match(result.stdout, /\brun\b/);
-  assert.match(result.stdout, /cookies import/);
+  assert.doesNotMatch(result.stdout, /cookies import/);
   assert.match(result.stdout, /profiles list/);
   assert.match(result.stdout, /Examples:/);
   assert.match(result.stdout, /cloak profiles list/);

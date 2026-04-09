@@ -1,7 +1,7 @@
 import yargs, { type Argv, type ArgumentsCamelCase } from "yargs";
 import { formatHeading } from "./output.js";
 
-export type HelpMode = {
+type HelpMode = {
   mode: "help";
   text: string;
 };
@@ -11,27 +11,18 @@ export type RunModeConfig = {
   headless: boolean;
   browserCookies?: {
     browser: "chrome";
-    url: string;
+    url?: string;
     profile?: string;
   };
 };
 
-export type ImportCookiesConfig = {
-  mode: "import-cookies";
-  browser: "chrome";
-  url: string;
-  profile?: string;
-  output?: string;
-};
-
-export type ListProfilesMode = {
+type ListProfilesMode = {
   mode: "list-profiles";
 };
 
-export type CliConfig =
+type CliConfig =
   | HelpMode
   | RunModeConfig
-  | ImportCookiesConfig
   | ListProfilesMode;
 
 function parseChromeBrowser(value: string): "chrome" {
@@ -77,12 +68,12 @@ function createParser(args: string[], scriptName: string): Argv {
 function rootEpilog(): string {
   return `${formatHeading("Examples:")}
   cloak profiles list
-  cloak cookies import --browser chrome --url https://x.com --chrome-profile "Default"
   cloak run
+  cloak run --cookies-from-browser chrome
   cloak run -w --cookies-from-browser chrome --cookie-url https://x.com
 
 ${formatHeading("Storage:")}
-  cloak keeps cookies and the pinned OpenCLI extension under ~/.config/cloak/
+  cloak caches the pinned OpenCLI extension under ~/.cache/cloak/
 `;
 }
 
@@ -90,7 +81,6 @@ function buildRootProgram(args: string[] = []): Argv {
   return createParser(args, "cloak")
     .usage("$0 <command>")
     .command("run", "launch Patchright headless by default")
-    .command("cookies import", "import Chrome cookies into ~/.config/cloak/cookies/")
     .command("profiles list", "list available Chrome profiles")
     .epilog(rootEpilog());
 }
@@ -100,7 +90,6 @@ function rootHelpTextInternal(): string {
 
 Commands:
   cloak run             launch Patchright headless by default
-  cloak cookies import  import Chrome cookies into ~/.config/cloak/cookies/
   cloak profiles list   list available Chrome profiles
 
 Options:
@@ -108,13 +97,6 @@ Options:
 
 ${rootEpilog()}`;
 }
-
-function buildCookiesProgram(args: string[] = []): Argv {
-  return createParser(args, "cloak cookies")
-    .usage("$0 <command>")
-    .command("import", "import Chrome cookies into ~/.config/cloak/cookies/");
-}
-
 function buildProfilesProgram(args: string[] = []): Argv {
   return createParser(args, "cloak profiles")
     .usage("$0 <command>")
@@ -125,10 +107,11 @@ function runEpilog(): string {
   return `${formatHeading("Examples:")}
   cloak run
   cloak run -w
+  cloak run --cookies-from-browser chrome
   cloak run --cookies-from-browser chrome --cookie-url https://x.com
 
 ${formatHeading("Storage:")}
-  cloak loads saved cookies from ~/.config/cloak/cookies/
+  cloak caches the pinned OpenCLI extension under ~/.cache/cloak/
 `;
 }
 
@@ -147,7 +130,7 @@ function buildRunProgram(args: string[] = []): Argv {
     })
     .option("cookie-url", {
       type: "string",
-      description: "HTTP(S) site URL to scope Chrome cookies",
+      description: "HTTP(S) site URL to scope Chrome cookies (optional in TTY mode)",
       coerce: parseUrl,
     })
     .option("chrome-profile", {
@@ -155,10 +138,6 @@ function buildRunProgram(args: string[] = []): Argv {
       description: "Chrome profile name",
     })
     .check((options: ArgumentsCamelCase<Record<string, unknown>>) => {
-      if (options.cookiesFromBrowser && !options.cookieUrl) {
-        throw new Error("--cookie-url is required when --cookies-from-browser is used");
-      }
-
       if (!options.cookiesFromBrowser && (options.cookieUrl || options.chromeProfile)) {
         throw new Error("--cookie-url and --chrome-profile require --cookies-from-browser");
       }
@@ -174,59 +153,11 @@ function runHelpText(): string {
 Options:
   -h, --help                          Show help
   -w, --window                        open a visible browser window
-      --cookies-from-browser <browser>  load cookies from Chrome for this run
-      --cookie-url <url>              HTTP(S) site URL to scope Chrome cookies
-      --chrome-profile <profile>      Chrome profile name
+  --cookies-from-browser <browser>  load cookies from Chrome for this run
+  --cookie-url <url>              HTTP(S) site URL to scope Chrome cookies
+  --chrome-profile <profile>      Chrome profile name
 
 ${runEpilog()}`;
-}
-
-function buildImportCookiesProgram(args: string[] = []): Argv {
-  return createParser(args, "cloak cookies import")
-    .usage("$0 [options]")
-    .option("browser", {
-      type: "string",
-      demandOption: true,
-      description: "browser to import cookies from (chrome only)",
-      coerce: parseChromeBrowser,
-    })
-    .option("url", {
-      type: "string",
-      demandOption: true,
-      description: "HTTP(S) site URL to scope Chrome cookies",
-      coerce: parseUrl,
-    })
-    .option("chrome-profile", {
-      type: "string",
-      description: "Chrome profile name",
-    })
-    .option("output", {
-      type: "string",
-      description: "output file path",
-    });
-}
-
-function cookiesHelpText(): string {
-  return `Usage: cloak cookies <command>
-
-Commands:
-  cloak cookies import  import Chrome cookies into ~/.config/cloak/cookies/
-
-Options:
-  -h, --help            Show help
-`;
-}
-
-function importCookiesHelpText(): string {
-  return `Usage: cloak cookies import [options]
-
-Options:
-  -h, --help                     Show help
-      --browser <browser>        browser to import cookies from (chrome only)
-      --url <url>                HTTP(S) site URL to scope Chrome cookies
-      --chrome-profile <profile> Chrome profile name
-      --output <output>          output file path
-`;
 }
 
 function buildListProfilesProgram(args: string[] = []): Argv {
@@ -278,7 +209,7 @@ function parseRunMode(args: string[]): CliConfig {
   const browserCookies = options.cookiesFromBrowser
     ? {
         browser: options.cookiesFromBrowser,
-        url: options.cookieUrl as string,
+        ...(options.cookieUrl ? { url: options.cookieUrl } : {}),
         ...(options.chromeProfile ? { profile: options.chromeProfile } : {}),
       }
     : undefined;
@@ -293,32 +224,6 @@ function parseRunMode(args: string[]): CliConfig {
         mode: "run",
         headless: !Boolean(options.window),
       };
-}
-
-function parseImportCookiesMode(args: string[]): CliConfig {
-  const parser = buildImportCookiesProgram(args);
-  const options = parser.parseSync() as unknown as {
-    help?: boolean;
-    browser: "chrome";
-    url: string;
-    chromeProfile?: string;
-    output?: string;
-  };
-
-  if (options.help) {
-    return {
-      mode: "help",
-      text: importCookiesHelpText(),
-    };
-  }
-
-  return {
-    mode: "import-cookies",
-    browser: options.browser,
-    url: options.url,
-    ...(options.chromeProfile ? { profile: options.chromeProfile } : {}),
-    ...(options.output ? { output: options.output } : {}),
-  };
 }
 
 function parseListProfilesMode(args: string[]): CliConfig {
@@ -365,29 +270,6 @@ export function parseCli(argv: string[]): CliConfig {
     return parseRunMode(args.slice(1));
   }
 
-  if (args[0] === "cookies") {
-    if (args.length === 1 || args[1] === "-h" || args[1] === "--help") {
-      return {
-        mode: "help",
-        text: cookiesHelpText(),
-      };
-    }
-
-    if (args[1] === "import") {
-      if (args.length === 3 && (args[2] === "-h" || args[2] === "--help")) {
-        return {
-          mode: "help",
-          text: importCookiesHelpText(),
-        };
-      }
-
-      return parseImportCookiesMode(args.slice(2));
-    }
-
-    buildCookiesProgram(args.slice(1)).parseSync();
-    throw new Error("cookies parsing should not return");
-  }
-
   if (args[0] === "profiles") {
     if (args.length === 1 || args[1] === "-h" || args[1] === "--help") {
       return {
@@ -419,6 +301,6 @@ export function isHeadlessEnabled(argv: string[]): boolean {
   return parsed.mode === "run" ? parsed.headless : false;
 }
 
-export function rootHelpText(): string {
+function rootHelpText(): string {
   return rootHelpTextInternal();
 }
