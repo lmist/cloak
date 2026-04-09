@@ -1,7 +1,7 @@
 {
   "name": "@lmist/cloak",
   "version": "1.0.0",
-  "description": "Patchright runner with required OpenCLI extension and Chrome cookie support",
+  "description": "Browser sidecar for OpenCLI with the required extension and Chrome cookie support",
   "repository": {
     "type": "git",
     "url": "https://github.com/lmist/cloak"
@@ -15,7 +15,11 @@
   "files": [
     "bin",
     "dist",
+    ".githooks/pre-commit",
+    ".githooks/pre-push",
     "scripts/postinstall.cjs",
+    "scripts/render-readme.cjs",
+    "scripts/setup-git-hooks.cjs",
     "docs/assets/cloak-logo-readme-centered.png",
     "src/app-paths.ts",
     "src/chrome-cookies.ts",
@@ -29,11 +33,14 @@
     "src/main.ts",
     "src/output.ts",
     "src/persisted-cookies.ts",
+    "README.md",
     "README.org"
   ],
   "scripts": {
     "postinstall": "node scripts/postinstall.cjs",
     "build": "node scripts/build.cjs",
+    "render-readme": "node scripts/render-readme.cjs",
+    "check-readme": "node scripts/render-readme.cjs --check",
     "prepack": "npm run build",
     "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit",
     "start": "node --import tsx src/main.ts",

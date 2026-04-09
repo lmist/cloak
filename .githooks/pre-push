@@ -1,0 +1,37 @@
+#!/bin/sh
+set -eu
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+readme_changed=false
+
+while read -r local_ref local_sha remote_ref remote_sha
+do
+  if [ -z "${local_ref:-}" ]; then
+    continue
+  fi
+
+  if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+    continue
+  fi
+
+  if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+    if git rev-list "$local_sha" --not --remotes | while read -r commit; do git diff-tree --no-commit-id --name-only -r "$commit"; done | grep -qx 'README.org'; then
+      readme_changed=true
+      break
+    fi
+    continue
+  fi
+
+  if git diff --name-only "$remote_sha" "$local_sha" | grep -qx 'README.org'; then
+    readme_changed=true
+    break
+  fi
+done
+
+if [ "$readme_changed" = false ]; then
+  exit 0
+fi
+
+node scripts/render-readme.cjs --check

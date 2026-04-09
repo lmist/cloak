@@ -1,18 +1,17 @@
-#+title: cloak
-#+property: header-args:sh :results output verbatim :exports code
+<!-- Generated from README.org by scripts/render-readme.cjs. Do not edit README.md directly. -->
 
-[[docs/assets/cloak-logo-readme-centered.png]]
+![cloak logo](docs/assets/cloak-logo-readme-centered.png)
 
-* what it is
+# what it is
 
-=cloak= is the browser sidecar for [[https://github.com/jackwener/opencli][OpenCLI]]. It launches a fresh [[https://github.com/Kaliiiiiiiiii-Vinyzu/patchright/][Patchright]] browser with the pinned [[https://github.com/jackwener/opencli/releases/download/v1.6.8/opencli-extension.zip][OpenCLI extension archive]] loaded every time it starts.
+`cloak` is the browser sidecar for [OpenCLI](https://github.com/jackwener/opencli). It launches a fresh [Patchright](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright/) browser with the pinned [OpenCLI extension archive](https://github.com/jackwener/opencli/releases/download/v1.6.8/opencli-extension.zip) loaded every time it starts.
 
 By default it runs headless. If you ask for Chrome cookies, it reads them from a local Chrome profile at startup, injects them into the fresh browser context for that run, and does not write those cookies back out to disk.
 
 What persists:
 
-- =~/.cache/cloak/opencli-extension.zip=
-- if you opt in, persisted cookie snapshots under =~/.config/cloak/cookies/=
+- `~/.cache/cloak/opencli-extension.zip`
+- if you opt in, persisted cookie snapshots under `~/.config/cloak/cookies/`
 
 What stays ephemeral:
 
@@ -20,58 +19,55 @@ What stays ephemeral:
 - the Patchright user data directory in the OS temp directory
 - the injected cookie set
 
-If you are using =cloak= as the browser sidecar for [[https://github.com/jackwener/opencli][OpenCLI]], install OpenCLI separately. =cloak= itself does not need the OpenCLI CLI in order to launch, but the intended setup is =OpenCLI + cloak= with =cloak= acting as the browser sidecar.
+If you are using `cloak` as the browser sidecar for [OpenCLI](https://github.com/jackwener/opencli), install OpenCLI separately. `cloak` itself does not need the OpenCLI CLI in order to launch, but the intended setup is `OpenCLI + cloak` with `cloak` acting as the browser sidecar.
 
 Chrome cookie import is an optional runtime feature. The base install should still work even if the native dependency chain behind Chrome cookie access does not install cleanly on a given machine.
 
-* prerequisites
+# prerequisites
 
 - Node.js 20 or newer
 - npm
 - git
 - Google Chrome, only if you want runtime cookie injection
 
-* install
+# install
 
-Install =cloak= globally and verify the CLI:
+Install `cloak` globally and verify the CLI:
 
-#+name: install-from-npm
-#+begin_src sh
+``` bash
 set -euo pipefail
 
 npm install -g @lmist/cloak
 cloak --help
-#+end_src
+```
 
-The package name is =@lmist/cloak=. The installed command remains =cloak=.
+The package name is `@lmist/cloak`. The installed command remains `cloak`.
 
-During =npm install=, =cloak= tries to:
+During `npm install`, `cloak` tries to:
 
 - warm the pinned OpenCLI extension cache
 - install the Patchright Chromium browser
 
 If the browser download step gets skipped or fails in your environment, retry it manually:
 
-#+begin_src sh
+``` bash
 npx patchright install chromium
-#+end_src
+```
 
 If you use OpenCLI with it, install that separately:
 
-#+name: install-opencli-optional
-#+begin_src sh
+``` bash
 set -euo pipefail
 
 npm install -g @jackwener/opencli
 npx skills add jackwener/opencli
-#+end_src
+```
 
-* from source
+# from source
 
-If you want to work on =cloak= itself, use the repository directly:
+If you want to work on `cloak` itself, use the repository directly:
 
-#+name: install-from-source
-#+begin_src sh
+``` bash
 set -euo pipefail
 
 repo_dir="${REPO_DIR:-$HOME/src/cloak}"
@@ -85,12 +81,11 @@ cd "$repo_dir"
 npm install
 npm run build
 node dist/main.js --help
-#+end_src
+```
 
 If you want the source checkout on your shell PATH while you work on it:
 
-#+name: install-from-source-globally
-#+begin_src sh
+``` bash
 set -euo pipefail
 
 repo_dir="${REPO_DIR:-$HOME/src/cloak}"
@@ -99,62 +94,55 @@ npm install
 npm run build
 npm install -g .
 cloak --help
-#+end_src
+```
 
-* setup and usage
+# setup and usage
 
-If you installed from a checkout but did not run =npm install -g .=, use =node dist/main.js= everywhere below in place of =cloak=.
+If you installed from a checkout but did not run `npm install -g .`, use `node dist/main.js` everywhere below in place of `cloak`.
 
 Discover Chrome profiles and their cookie-bearing sites:
 
-#+name: list-profiles
-#+begin_src sh
+``` bash
 cloak profiles list
-#+end_src
+```
 
 In an interactive terminal that opens a searchable picker. In a non-interactive terminal it prints a plain-text report grouped by profile.
 
 Start a clean headless browser:
 
-#+name: run-headless
-#+begin_src sh
+``` bash
 cloak run
-#+end_src
+```
 
 Start a visible window instead of headless mode:
 
-#+name: run-window
-#+begin_src sh
+``` bash
 cloak run --window
-#+end_src
+```
 
-Let =cloak= pick a Chrome site interactively and inject cookies for a single run:
+Let `cloak` pick a Chrome site interactively and inject cookies for a single run:
 
-#+name: run-with-picked-cookies
-#+begin_src sh
+``` bash
 cloak run --cookies-from-browser chrome
-#+end_src
+```
 
-Offer to persist the imported cookies after =cloak= reads them:
+Offer to persist the imported cookies after `cloak` reads them:
 
-#+name: run-with-persisted-cookies
-#+begin_src sh
+``` bash
 cloak run --cookies-from-browser chrome --persist-cookies
-#+end_src
+```
 
-If you accept the prompt, =cloak= writes the imported cookie set to =~/.config/cloak/cookies/<hostname>.json=.
+If you accept the prompt, `cloak` writes the imported cookie set to `~/.config/cloak/cookies/<hostname>.json`.
 
 Use an explicit site URL and Chrome profile when you already know the target or when you are scripting it:
 
-#+name: run-with-explicit-cookies
-#+begin_src sh
+``` bash
 cloak run --cookies-from-browser chrome --cookie-url https://x.com --chrome-profile "Default"
-#+end_src
+```
 
 Use this smoke test if you want a non-interactive startup check that exits automatically instead of waiting for Ctrl+C:
 
-#+name: smoke-test
-#+begin_src sh
+``` bash
 set -euo pipefail
 
 if command -v cloak >/dev/null 2>&1; then
@@ -179,12 +167,11 @@ sleep 5
 kill -INT "$pid" || true
 wait "$pid" || true
 cat "$log_file"
-#+end_src
+```
 
 For local development inside the repository:
 
-#+name: dev-checks
-#+begin_src sh
+``` bash
 set -euo pipefail
 
 npm test
@@ -198,10 +185,10 @@ fi
 if command -v just >/dev/null 2>&1; then
   just ci
 fi
-#+end_src
+```
 
-* one sharp edge
+# one sharp edge
 
-Chrome cookie extraction depends on =chrome-cookies-secure=, and that tool can collapse same-name cookies across different paths or subdomains before =cloak= sees them. If a login still fails after injection, that is the first thing to suspect.
+Chrome cookie extraction depends on `chrome-cookies-secure`, and that tool can collapse same-name cookies across different paths or subdomains before `cloak` sees them. If a login still fails after injection, that is the first thing to suspect.
 
-If =cloak run --cookies-from-browser chrome= tells you Chrome cookie support is unavailable, reinstall in an environment where the optional native dependency chain can be built successfully.
+If `cloak run --cookies-from-browser chrome` tells you Chrome cookie support is unavailable, reinstall in an environment where the optional native dependency chain can be built successfully.

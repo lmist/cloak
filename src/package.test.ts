@@ -30,10 +30,14 @@ test("package metadata exposes the cloak binary", () => {
   assert.deepEqual(packageJson.bin, {
     cloak: "bin/cloak.js",
   });
-  assert.deepEqual(packageJson.files, [
+  assert.deepEqual([...packageJson.files ?? []].sort(), [
+    ".githooks/pre-commit",
+    ".githooks/pre-push",
     "bin",
     "dist",
     "scripts/postinstall.cjs",
+    "scripts/render-readme.cjs",
+    "scripts/setup-git-hooks.cjs",
     "docs/assets/cloak-logo-readme-centered.png",
     "src/app-paths.ts",
     "src/chrome-cookies.ts",
@@ -47,13 +51,16 @@ test("package metadata exposes the cloak binary", () => {
     "src/main.ts",
     "src/output.ts",
     "src/persisted-cookies.ts",
+    "README.md",
     "README.org",
-  ]);
+  ].sort());
   assert.equal(packageJson.scripts?.postinstall, "node scripts/postinstall.cjs");
   assert.equal(
     packageJson.scripts?.build,
     "node scripts/build.cjs"
   );
+  assert.equal(packageJson.scripts?.["render-readme"], "node scripts/render-readme.cjs");
+  assert.equal(packageJson.scripts?.["check-readme"], "node scripts/render-readme.cjs --check");
   assert.equal(packageJson.scripts?.prepare, undefined);
   assert.equal(packageJson.scripts?.prepack, "npm run build");
   assert.equal(packageJson.scripts?.test, "node --import tsx --test src/**/*.test.ts");
@@ -90,8 +97,10 @@ test("postinstall warms the extension cache and installs Patchright Chromium", (
   assert.match(postinstall, /"src", "install-extension\.ts"/);
   assert.match(postinstall, /"node_modules", "patchright", "cli\.js"/);
   assert.match(postinstall, /"install", "chromium"/);
+  assert.match(postinstall, /setup-git-hooks\.cjs/);
   assert.match(postinstall, /failed to warm the OpenCLI extension cache during postinstall/);
   assert.match(postinstall, /failed to install the Patchright Chromium browser during postinstall/);
+  assert.match(postinstall, /failed to configure local git hooks/);
 });
 
 test("package tarball includes the built node entrypoint", () => {
@@ -117,6 +126,11 @@ test("package tarball includes the built node entrypoint", () => {
 
   assert.ok(packedPaths.includes("bin/cloak.js"));
   assert.ok(packedPaths.includes("dist/main.js"));
+  assert.ok(packedPaths.includes("README.md"));
+  assert.ok(packedPaths.includes("scripts/render-readme.cjs"));
+  assert.ok(packedPaths.includes("scripts/setup-git-hooks.cjs"));
+  assert.ok(packedPaths.includes(".githooks/pre-commit"));
+  assert.ok(packedPaths.includes(".githooks/pre-push"));
   assert.ok(packedPaths.includes("docs/assets/cloak-logo-readme-centered.png"));
   assert.ok(packedPaths.includes("scripts/postinstall.cjs"));
   assert.ok(packedPaths.includes("src/main.ts"));
@@ -161,4 +175,15 @@ test("readme documents the current Node workflow and CLI surface", () => {
   assert.match(readme, /--cookies-from-browser chrome/);
   assert.match(readme, /chrome-cookies-secure/);
   assert.doesNotMatch(readme, /cookies import/);
+});
+
+test("generated README.md exists and is marked as generated", () => {
+  const readme = fs.readFileSync(path.resolve("README.md"), "utf8");
+
+  assert.match(
+    readme,
+    /^<!-- Generated from README\.org by scripts\/render-readme\.cjs\. Do not edit README\.md directly\. -->/m
+  );
+  assert.match(readme, /@lmist\/cloak/);
+  assert.match(readme, /browser sidecar .*OpenCLI/i);
 });

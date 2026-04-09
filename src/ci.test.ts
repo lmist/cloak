@@ -29,7 +29,9 @@ test("ci workflow uses Node and npm for install, test, typecheck, and build", ()
   assert.match(workflow, /uses:\s+actions\/setup-node@v5/);
   assert.match(workflow, /node-version:\s+24/);
   assert.match(workflow, /cache:\s+npm/);
+  assert.match(workflow, /sudo apt-get update && sudo apt-get install -y pandoc/);
   assert.match(workflow, /npm ci/);
+  assert.match(workflow, /npm run check-readme/);
   assert.match(workflow, /npm test/);
   assert.match(workflow, /npm run typecheck/);
   assert.match(workflow, /npm run build/);

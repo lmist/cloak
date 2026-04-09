@@ -9,6 +9,7 @@ const distEntrypoint = path.join(rootDir, "dist", "install-extension.js");
 const sourceEntrypoint = path.join(rootDir, "src", "install-extension.ts");
 const tsxEntrypoint = path.join(rootDir, "node_modules", "tsx", "dist", "loader.mjs");
 const patchrightCliEntrypoint = path.join(rootDir, "node_modules", "patchright", "cli.js");
+const setupHooksEntrypoint = path.join(rootDir, "scripts", "setup-git-hooks.cjs");
 
 const command = process.execPath;
 const args = existsSync(sourceEntrypoint) && existsSync(tsxEntrypoint)
@@ -38,6 +39,17 @@ if (existsSync(patchrightCliEntrypoint)) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(
       `[cloak] Warning: failed to install the Patchright Chromium browser during postinstall. You can retry with 'npx patchright install chromium'. (${message})`
+    );
+  }
+}
+
+if (existsSync(setupHooksEntrypoint)) {
+  try {
+    runPostinstallStep([setupHooksEntrypoint]);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[cloak] Warning: failed to configure local git hooks. You can retry with 'node scripts/setup-git-hooks.cjs'. (${message})`
     );
   }
 }
