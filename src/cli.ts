@@ -20,65 +20,65 @@ export type RunModeConfig = {
   cookieUrls: string[]
 }
 
-type StopMode = {
-  mode: "stop"
+type DaemonStatusMode = {
+  mode: "daemon-status"
 }
 
-type RestartMode = {
-  mode: "restart"
+type DaemonStopMode = {
+  mode: "daemon-stop"
 }
 
-type InspectMode = {
-  mode: "inspect"
+type DaemonRestartMode = {
+  mode: "daemon-restart"
 }
 
 type DaemonLogsMode = {
   mode: "daemon-logs"
 }
 
-type StateDisplayMode = {
-  mode: "state-display"
+type ProfileListMode = {
+  mode: "profile-list"
 }
 
-type StateDestroyMode = {
-  mode: "state-destroy"
+type ProfileShowMode = {
+  mode: "profile-show"
 }
 
-type ListProfilesMode = {
-  mode: "list-profiles"
-}
-
-type ProfilesStatusMode = {
-  mode: "profiles-status"
-}
-
-type ProfilesSetDefaultMode = {
-  mode: "profiles-set-default"
+type ProfileUseMode = {
+  mode: "profile-use"
   profile: string
   consent: boolean
 }
 
-type CookiesListMode = {
-  mode: "cookies-list"
+type SitesListMode = {
+  mode: "sites-list"
   limit: number
   noPager: boolean
   consent: boolean
+}
+
+type StorageShowMode = {
+  mode: "storage-show"
+}
+
+type StorageDestroyMode = {
+  mode: "storage-destroy"
 }
 
 type CliConfig =
   | HelpMode
   | VersionMode
   | RunModeConfig
-  | StopMode
-  | RestartMode
-  | InspectMode
+  | DaemonStatusMode
+  | DaemonStopMode
+  | DaemonRestartMode
   | DaemonLogsMode
-  | StateDisplayMode
-  | StateDestroyMode
-  | ListProfilesMode
-  | ProfilesStatusMode
-  | ProfilesSetDefaultMode
-  | CookiesListMode
+  | ProfileListMode
+  | ProfileShowMode
+  | ProfileUseMode
+  | SitesListMode
+  | StorageShowMode
+  | StorageDestroyMode
 
 function parseUrl(value: string): string {
   try {
@@ -151,15 +151,6 @@ function rootEpilog(): string {
   cloak storage destroy
   cloak version
 
-${formatHeading("Legacy aliases:")}
-  cloak run --daemon          alias for cloak daemon start
-  cloak inspect               alias for cloak daemon status
-  cloak stop                  alias for cloak daemon stop
-  cloak restart               alias for cloak daemon restart
-  cloak profiles ...          alias for cloak profile ...
-  cloak cookies list          alias for cloak sites list
-  cloak state ...             alias for cloak storage ...
-
 ${formatHeading("Storage:")}
   cloak stores state in ~/.config/cloak/state.sqlite
   cloak stores daemon logs and the pinned OpenCLI extension under ~/.cache/cloak/
@@ -170,10 +161,10 @@ function buildRootProgram(args: string[] = []): Argv {
   return createParser(args, "cloak")
     .usage("$0 <command>")
     .command("run", "launch Patchright headless by default")
-    .command("daemon", "start, inspect, stop, restart, or tail the managed daemon")
+    .command("daemon", "start, inspect, stop, restart, or print the managed daemon log")
     .command("profile", "list, show, or select a Chrome profile")
     .command("sites", "list cookie-bearing site URLs for the active profile")
-    .command("storage", "inspect or destroy cloak state")
+    .command("storage", "inspect or destroy cloak storage")
     .command("version", "print the installed cloak version")
     .epilog(rootEpilog())
 }
@@ -192,8 +183,8 @@ Commands:
   cloak profile show                  show the saved default Chrome profile
   cloak profile use <name>            save the default Chrome profile
   cloak sites list                    list Chrome cookie URLs for the active profile
-  cloak storage show                  show the cloak state paths
-  cloak storage destroy               destroy cloak state after confirmation
+  cloak storage show                  show the cloak storage paths
+  cloak storage destroy               destroy cloak storage after confirmation
   cloak version                       print the installed cloak version
 
 Options:
@@ -225,11 +216,6 @@ function buildRunProgram(args: string[] = []): Argv {
       alias: "w",
       type: "boolean",
       description: "open a visible browser window",
-    })
-    .option("daemon", {
-      alias: "d",
-      type: "boolean",
-      description: "run in the background and manage it with daemon status/stop/restart",
     })
     .option("profile", {
       type: "string",
@@ -269,7 +255,6 @@ function runHelpText(): string {
 Options:
   -h, --help               Show help
   -w, --window             open a visible browser window
-  -d, --daemon             run in the background
   --profile <profile>      Chrome profile directory name
   --cookie-url <url>       HTTP(S) site URL to import cookies from
   --persist-cookies        remember the provided --cookie-url values
@@ -458,16 +443,16 @@ Options:
 function buildStorageProgram(args: string[] = []): Argv {
   return createParser(args, "cloak storage")
     .usage("$0 <command>")
-    .command("show", "show the cloak state paths")
-    .command("destroy", "destroy cloak state after confirmation")
+    .command("show", "show the cloak storage paths")
+    .command("destroy", "destroy cloak storage after confirmation")
 }
 
 function storageHelpText(): string {
   return `Usage: cloak storage <command>
 
 Commands:
-  cloak storage show     show the cloak state paths
-  cloak storage destroy  destroy cloak state after confirmation
+  cloak storage show     show the cloak storage paths
+  cloak storage destroy  destroy cloak storage after confirmation
 
 Options:
   -h, --help             Show help
@@ -479,7 +464,6 @@ function parseRunMode(args: string[]): CliConfig {
   const options = parser.parseSync() as {
     help?: boolean
     window?: boolean
-    daemon?: boolean
     profile?: string
     cookieUrl?: string[]
     persistCookies?: boolean
@@ -496,7 +480,7 @@ function parseRunMode(args: string[]): CliConfig {
   return {
     mode: "run",
     headless: !Boolean(options.window),
-    daemon: Boolean(options.daemon),
+    daemon: false,
     persistCookies: Boolean(options.persistCookies),
     consent: Boolean(options.consent),
     profile: options.profile,
@@ -554,7 +538,7 @@ function parseProfileUseMode(args: string[]): CliConfig {
   }
 
   return {
-    mode: "profiles-set-default",
+    mode: "profile-use",
     profile,
     consent: Boolean(options.consent),
   }
@@ -578,7 +562,7 @@ function parseSitesListMode(args: string[]): CliConfig {
   }
 
   return {
-    mode: "cookies-list",
+    mode: "sites-list",
     limit: options.limit ?? 100,
     noPager: options.pager === false,
     consent: Boolean(options.consent),
@@ -645,7 +629,7 @@ export function parseCli(argv: string[]): CliConfig {
       }
 
       buildZeroArgProgram(args.slice(2), "cloak daemon status").parseSync()
-      return { mode: "inspect" }
+      return { mode: "daemon-status" }
     }
 
     if (args[1] === "stop") {
@@ -657,7 +641,7 @@ export function parseCli(argv: string[]): CliConfig {
       }
 
       buildZeroArgProgram(args.slice(2), "cloak daemon stop").parseSync()
-      return { mode: "stop" }
+      return { mode: "daemon-stop" }
     }
 
     if (args[1] === "restart") {
@@ -669,7 +653,7 @@ export function parseCli(argv: string[]): CliConfig {
       }
 
       buildZeroArgProgram(args.slice(2), "cloak daemon restart").parseSync()
-      return { mode: "restart" }
+      return { mode: "daemon-restart" }
     }
 
     if (args[1] === "logs") {
@@ -688,55 +672,7 @@ export function parseCli(argv: string[]): CliConfig {
     throw new Error("daemon parsing should not return")
   }
 
-  if (args[0] === "inspect") {
-    return { mode: "inspect" }
-  }
-
-  if (args[0] === "stop") {
-    return { mode: "stop" }
-  }
-
-  if (args[0] === "restart") {
-    return { mode: "restart" }
-  }
-
-  if (args[0] === "storage" || args[0] === "state") {
-    if (args.length === 1 || isHelpFlag(args[1])) {
-      return {
-        mode: "help",
-        text: storageHelpText(),
-      }
-    }
-
-    if (args[1] === "show" || args[1] === "display") {
-      if (args.length === 3 && isHelpFlag(args[2])) {
-        return {
-          mode: "help",
-          text: zeroArgHelpText("cloak storage show"),
-        }
-      }
-
-      buildZeroArgProgram(args.slice(2), "cloak storage show").parseSync()
-      return { mode: "state-display" }
-    }
-
-    if (args[1] === "destroy") {
-      if (args.length === 3 && isHelpFlag(args[2])) {
-        return {
-          mode: "help",
-          text: zeroArgHelpText("cloak storage destroy"),
-        }
-      }
-
-      buildZeroArgProgram(args.slice(2), "cloak storage destroy").parseSync()
-      return { mode: "state-destroy" }
-    }
-
-    buildStorageProgram(args.slice(1)).parseSync()
-    throw new Error("storage parsing should not return")
-  }
-
-  if (args[0] === "profile" || args[0] === "profiles") {
+  if (args[0] === "profile") {
     if (args.length === 1 || isHelpFlag(args[1])) {
       return {
         mode: "help",
@@ -753,10 +689,10 @@ export function parseCli(argv: string[]): CliConfig {
       }
 
       buildZeroArgProgram(args.slice(2), "cloak profile list").parseSync()
-      return { mode: "list-profiles" }
+      return { mode: "profile-list" }
     }
 
-    if (args[1] === "show" || args[1] === "status") {
+    if (args[1] === "show") {
       if (args.length === 3 && isHelpFlag(args[2])) {
         return {
           mode: "help",
@@ -765,7 +701,7 @@ export function parseCli(argv: string[]): CliConfig {
       }
 
       buildZeroArgProgram(args.slice(2), "cloak profile show").parseSync()
-      return { mode: "profiles-status" }
+      return { mode: "profile-show" }
     }
 
     if (args[1] === "use") {
@@ -779,22 +715,11 @@ export function parseCli(argv: string[]): CliConfig {
       return parseProfileUseMode(args.slice(2))
     }
 
-    if (args[1] === "set" && args[2] === "default") {
-      if (args.length === 4 && isHelpFlag(args[3])) {
-        return {
-          mode: "help",
-          text: profileUseHelpText(),
-        }
-      }
-
-      return parseProfileUseMode(args.slice(3))
-    }
-
     buildProfileProgram(args.slice(1)).parseSync()
     throw new Error("profile parsing should not return")
   }
 
-  if (args[0] === "sites" || args[0] === "cookies") {
+  if (args[0] === "sites") {
     if (args.length === 1 || isHelpFlag(args[1])) {
       return {
         mode: "help",
@@ -815,6 +740,42 @@ export function parseCli(argv: string[]): CliConfig {
 
     buildSitesProgram(args.slice(1)).parseSync()
     throw new Error("sites parsing should not return")
+  }
+
+  if (args[0] === "storage") {
+    if (args.length === 1 || isHelpFlag(args[1])) {
+      return {
+        mode: "help",
+        text: storageHelpText(),
+      }
+    }
+
+    if (args[1] === "show") {
+      if (args.length === 3 && isHelpFlag(args[2])) {
+        return {
+          mode: "help",
+          text: zeroArgHelpText("cloak storage show"),
+        }
+      }
+
+      buildZeroArgProgram(args.slice(2), "cloak storage show").parseSync()
+      return { mode: "storage-show" }
+    }
+
+    if (args[1] === "destroy") {
+      if (args.length === 3 && isHelpFlag(args[2])) {
+        return {
+          mode: "help",
+          text: zeroArgHelpText("cloak storage destroy"),
+        }
+      }
+
+      buildZeroArgProgram(args.slice(2), "cloak storage destroy").parseSync()
+      return { mode: "storage-destroy" }
+    }
+
+    buildStorageProgram(args.slice(1)).parseSync()
+    throw new Error("storage parsing should not return")
   }
 
   return parseRootMode(args)

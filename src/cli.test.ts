@@ -10,7 +10,7 @@ function runInlineScript(script: string) {
   })
 }
 
-test("parseCli shows canonical help mode with no arguments", () => {
+test("parseCli shows canonical help mode with no legacy commands", () => {
   const cli = parseCli(["node", "dist/main.js"])
 
   assert.equal(cli.mode, "help")
@@ -21,6 +21,12 @@ test("parseCli shows canonical help mode with no arguments", () => {
   assert.match(cli.text, /cloak sites list/i)
   assert.match(cli.text, /cloak storage show/i)
   assert.match(cli.text, /cloak version/i)
+  assert.doesNotMatch(cli.text, /cloak inspect/i)
+  assert.doesNotMatch(cli.text, /cloak stop/i)
+  assert.doesNotMatch(cli.text, /cloak restart/i)
+  assert.doesNotMatch(cli.text, /cloak profiles\b/i)
+  assert.doesNotMatch(cli.text, /cloak cookies list/i)
+  assert.doesNotMatch(cli.text, /cloak state\b/i)
 })
 
 test("parseCli parses version mode", () => {
@@ -77,13 +83,13 @@ test("parseCli parses daemon start with consent profile and cookie URLs", () => 
 
 test("parseCli parses daemon status stop restart and logs", () => {
   assert.deepEqual(parseCli(["node", "dist/main.js", "daemon", "status"]), {
-    mode: "inspect",
+    mode: "daemon-status",
   })
   assert.deepEqual(parseCli(["node", "dist/main.js", "daemon", "stop"]), {
-    mode: "stop",
+    mode: "daemon-stop",
   })
   assert.deepEqual(parseCli(["node", "dist/main.js", "daemon", "restart"]), {
-    mode: "restart",
+    mode: "daemon-restart",
   })
   assert.deepEqual(parseCli(["node", "dist/main.js", "daemon", "logs"]), {
     mode: "daemon-logs",
@@ -92,10 +98,10 @@ test("parseCli parses daemon status stop restart and logs", () => {
 
 test("parseCli parses profile commands", () => {
   assert.deepEqual(parseCli(["node", "dist/main.js", "profile", "list"]), {
-    mode: "list-profiles",
+    mode: "profile-list",
   })
   assert.deepEqual(parseCli(["node", "dist/main.js", "profile", "show"]), {
-    mode: "profiles-status",
+    mode: "profile-show",
   })
   assert.deepEqual(
     parseCli([
@@ -107,7 +113,7 @@ test("parseCli parses profile commands", () => {
       "--consent",
     ]),
     {
-      mode: "profiles-set-default",
+      mode: "profile-use",
       profile: "Profile 7",
       consent: true,
     }
@@ -126,7 +132,7 @@ test("parseCli parses sites list mode", () => {
       "20",
     ]),
     {
-      mode: "cookies-list",
+      mode: "sites-list",
       limit: 20,
       noPager: true,
       consent: false,
@@ -136,82 +142,41 @@ test("parseCli parses sites list mode", () => {
 
 test("parseCli parses storage show and destroy", () => {
   assert.deepEqual(parseCli(["node", "dist/main.js", "storage", "show"]), {
-    mode: "state-display",
+    mode: "storage-show",
   })
   assert.deepEqual(parseCli(["node", "dist/main.js", "storage", "destroy"]), {
-    mode: "state-destroy",
+    mode: "storage-destroy",
   })
 })
 
-test("parseCli keeps legacy aliases working", () => {
-  assert.deepEqual(parseCli(["node", "dist/main.js", "inspect"]), {
-    mode: "inspect",
-  })
-  assert.deepEqual(parseCli(["node", "dist/main.js", "stop"]), {
-    mode: "stop",
-  })
-  assert.deepEqual(parseCli(["node", "dist/main.js", "restart"]), {
-    mode: "restart",
-  })
-  assert.deepEqual(parseCli(["node", "dist/main.js", "state", "display"]), {
-    mode: "state-display",
-  })
-  assert.deepEqual(parseCli(["node", "dist/main.js", "profiles", "status"]), {
-    mode: "profiles-status",
-  })
-  assert.deepEqual(
-    parseCli([
-      "node",
-      "dist/main.js",
-      "profiles",
-      "set",
-      "default",
-      "Profile 7",
-      "--consent",
-    ]),
-    {
-      mode: "profiles-set-default",
-      profile: "Profile 7",
-      consent: true,
-    }
+test("parseCli rejects removed legacy commands and flags", () => {
+  assert.throws(
+    () => parseCli(["node", "dist/main.js", "inspect"]),
+    /unknown|command|arguments/i
   )
-  assert.deepEqual(
-    parseCli([
-      "node",
-      "dist/main.js",
-      "cookies",
-      "list",
-      "--no-pager",
-      "--limit",
-      "20",
-    ]),
-    {
-      mode: "cookies-list",
-      limit: 20,
-      noPager: true,
-      consent: false,
-    }
+  assert.throws(
+    () => parseCli(["node", "dist/main.js", "stop"]),
+    /unknown|command|arguments/i
   )
-  assert.deepEqual(
-    parseCli([
-      "node",
-      "dist/main.js",
-      "run",
-      "--daemon",
-      "--profile",
-      "Profile 7",
-      "--cookie-url",
-      "https://x.com",
-    ]),
-    {
-      mode: "run",
-      headless: true,
-      daemon: true,
-      persistCookies: false,
-      consent: false,
-      profile: "Profile 7",
-      cookieUrls: ["https://x.com/"],
-    }
+  assert.throws(
+    () => parseCli(["node", "dist/main.js", "restart"]),
+    /unknown|command|arguments/i
+  )
+  assert.throws(
+    () => parseCli(["node", "dist/main.js", "profiles", "status"]),
+    /unknown|command|arguments/i
+  )
+  assert.throws(
+    () => parseCli(["node", "dist/main.js", "cookies", "list"]),
+    /unknown|command|arguments/i
+  )
+  assert.throws(
+    () => parseCli(["node", "dist/main.js", "state", "display"]),
+    /unknown|command|arguments/i
+  )
+  assert.throws(
+    () => parseCli(["node", "dist/main.js", "run", "--daemon"]),
+    /unknown|argument/i
   )
 })
 

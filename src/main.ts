@@ -244,17 +244,17 @@ export async function main(
     return
   }
 
-  if (cli.mode === "list-profiles") {
+  if (cli.mode === "profile-list") {
     await handleListProfiles(log, dependencies)
     return
   }
 
-  if (cli.mode === "profiles-status") {
+  if (cli.mode === "profile-show") {
     const stateDb = loadExistingStateDb(appPaths, dependencies)
     const profile = stateDb?.getDefaultProfile()
 
     if (!profile) {
-      log("No default profile selected. Use `cloak profiles set default <profile>`.")
+      log("No default profile selected. Use `cloak profile use <profile>`.")
       return
     }
 
@@ -262,7 +262,7 @@ export async function main(
     return
   }
 
-  if (cli.mode === "profiles-set-default") {
+  if (cli.mode === "profile-use") {
     const stateDb = await ensureStateDb(appPaths, cli.consent, dependencies)
 
     if (!stateDb) {
@@ -276,12 +276,12 @@ export async function main(
     return
   }
 
-  if (cli.mode === "cookies-list") {
+  if (cli.mode === "sites-list") {
     await handleCookiesList(cli, appPaths, log, dependencies)
     return
   }
 
-  if (cli.mode === "inspect") {
+  if (cli.mode === "daemon-status") {
     handleInspect(appPaths, log, dependencies)
     return
   }
@@ -291,22 +291,22 @@ export async function main(
     return
   }
 
-  if (cli.mode === "state-display") {
+  if (cli.mode === "storage-show") {
     handleStateDisplay(appPaths, log, dependencies)
     return
   }
 
-  if (cli.mode === "state-destroy") {
+  if (cli.mode === "storage-destroy") {
     await handleStateDestroy(appPaths, log, dependencies)
     return
   }
 
-  if (cli.mode === "stop") {
+  if (cli.mode === "daemon-stop") {
     await handleStop(appPaths, log, dependencies)
     return
   }
 
-  if (cli.mode === "restart") {
+  if (cli.mode === "daemon-restart") {
     await handleRestart(appPaths, log, dependencies)
     return
   }
@@ -372,7 +372,7 @@ async function handleCookiesList(
   const profile = stateDb?.getDefaultProfile()
 
   if (!profile) {
-    throw new Error("No default profile selected. Use `cloak profiles set default <profile>`.")
+    throw new Error("No default profile selected. Use `cloak profile use <profile>`.")
   }
 
   await resolveChromeProfile(profile, dependencies)
@@ -500,7 +500,7 @@ function handleStateDisplay(
       ? `running (${daemon.pid})`
       : `stale (${daemon.pid})`
   const lines = [
-    "cloak state",
+    "cloak storage",
     `config dir: ${appPaths.configDir}`,
     `sqlite: ${appPaths.stateDbPath}`,
     `sqlite present: ${stateDbExists ? "yes" : "no"}`,
@@ -562,12 +562,12 @@ async function handleStateDestroy(
   const pathExists = dependencies.pathExists ?? fs.existsSync
 
   if (!pathExists(appPaths.configDir)) {
-    log("No cloak state to destroy.")
+    log("No cloak storage to destroy.")
     return
   }
 
   if (!isInteractiveTerminal(dependencies)) {
-    throw new Error("`cloak state destroy` requires an interactive terminal.")
+    throw new Error("`cloak storage destroy` requires an interactive terminal.")
   }
 
   const confirmDestroyState =
@@ -589,7 +589,7 @@ async function handleStateDestroy(
 
   const removeDir = dependencies.removeDir ?? fs.rmSync
   removeDir(appPaths.configDir, { recursive: true, force: true })
-  log(formatSuccess(`Destroyed cloak state under ${appPaths.configDir}`))
+  log(formatSuccess(`Destroyed cloak storage under ${appPaths.configDir}`))
 }
 
 async function handleRestart(
@@ -600,7 +600,7 @@ async function handleRestart(
   const stateDb = loadExistingStateDb(appPaths, dependencies)
 
   if (!stateDb) {
-    throw new Error("No saved daemon command found. Run `cloak run --daemon` first.")
+    throw new Error("No saved daemon command found. Run `cloak daemon start` first.")
   }
 
   const currentDaemon = stateDb.getDaemonState()
@@ -624,7 +624,7 @@ async function handleRestart(
   }
 
   if (!command) {
-    throw new Error("No saved daemon command found. Run `cloak run --daemon` first.")
+    throw new Error("No saved daemon command found. Run `cloak daemon start` first.")
   }
 
   await startDaemon(command, appPaths, log, dependencies)
@@ -658,7 +658,7 @@ async function resolveRunConfig(
 
   if ((cookieUrls.length > 0 || cli.persistCookies) && !profile) {
     throw new Error(
-      "A Chrome profile is required. Use `cloak profiles set default <profile>` or pass --profile."
+      "A Chrome profile is required. Use `cloak profile use <profile>` or pass --profile."
     )
   }
 
@@ -681,7 +681,7 @@ async function handleDaemonRun(
   const stateDb = await ensureStateDb(appPaths, true, dependencies)
 
   if (!stateDb) {
-    throw new Error("Unable to create cloak state.")
+    throw new Error("Unable to create cloak storage.")
   }
 
   const existing = stateDb.getDaemonState()
@@ -690,7 +690,7 @@ async function handleDaemonRun(
 
   if (existing) {
     if (processIsRunning(existing.pid)) {
-      throw new Error("A cloak daemon is already running. Use `cloak restart` or `cloak stop`.")
+      throw new Error("A cloak daemon is already running. Use `cloak daemon restart` or `cloak daemon stop`.")
     }
 
     stateDb.clearDaemonState()
@@ -717,7 +717,7 @@ async function startDaemon(
   const stateDb = await ensureStateDb(appPaths, true, dependencies)
 
   if (!stateDb) {
-    throw new Error("Unable to create cloak state.")
+    throw new Error("Unable to create cloak storage.")
   }
 
   const spawnDaemonProcessFn =
@@ -757,7 +757,7 @@ async function rememberCookieUrls(
   const stateDb = await ensureStateDb(appPaths, true, dependencies)
 
   if (!stateDb) {
-    throw new Error("Unable to create cloak state.")
+    throw new Error("Unable to create cloak storage.")
   }
 
   const remembered = stateDb.rememberCookieUrls(
@@ -1005,7 +1005,7 @@ async function defaultConfirmDestroyState(configDir: string): Promise<boolean> {
 
   try {
     const answer = await rl.question(
-      `Destroy cloak state under ${configDir}? This cannot be undone. [y/N] `
+      `Destroy cloak storage under ${configDir}? This cannot be undone. [y/N] `
     )
     return /^(y|yes)$/i.test(answer.trim())
   } finally {

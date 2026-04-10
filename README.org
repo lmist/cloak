@@ -130,8 +130,6 @@ cloak storage show
 cloak storage destroy
 #+end_src
 
-Legacy aliases still work if you already depend on them: =cloak run --daemon=, =cloak inspect=, =cloak stop=, =cloak restart=, =cloak profiles ...=, =cloak cookies list=, and =cloak state ...=.
-
 * runtime and storage
 
 =cloak= launches headless by default. Pass =--window= when you want a visible browser window.

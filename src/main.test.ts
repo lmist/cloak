@@ -122,7 +122,7 @@ test("resolveStartupCookies loads every requested URL and warns once", async () 
   assert.equal(warnings.length, 1)
 })
 
-test("main saves the default profile", async () => {
+test("main saves the selected profile", async () => {
   const appPaths = createAppPaths()
   const logger = createLogCollector()
 
@@ -363,7 +363,7 @@ test("main run in daemon mode stores daemon state", async () => {
   })
 })
 
-test("main inspect reports the active daemon", async () => {
+test("main daemon status reports the active daemon", async () => {
   const appPaths = createAppPaths()
   fs.mkdirSync(appPaths.configDir, { recursive: true })
   const stateDb = new CloakStateDb(appPaths.stateDbPath)
@@ -414,7 +414,7 @@ test("main daemon logs reports when no cached log exists", async () => {
   assert.match(logger.lines[0] ?? "", new RegExp(appPaths.daemonLogPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
 })
 
-test("main state display shows the sqlite path and current state summary", async () => {
+test("main storage show reports the sqlite path and current state summary", async () => {
   const appPaths = createAppPaths()
   fs.mkdirSync(appPaths.configDir, { recursive: true })
   const stateDb = new CloakStateDb(appPaths.stateDbPath)
@@ -440,7 +440,7 @@ test("main state display shows the sqlite path and current state summary", async
   assert.match(logger.lines[0] ?? "", /daemon: running \(4242\)/)
 })
 
-test("main stop clears the saved daemon state", async () => {
+test("main daemon stop clears the saved daemon state", async () => {
   const appPaths = createAppPaths()
   fs.mkdirSync(appPaths.configDir, { recursive: true })
   const stateDb = new CloakStateDb(appPaths.stateDbPath)
@@ -465,7 +465,7 @@ test("main stop clears the saved daemon state", async () => {
   assert.match(logger.lines[0] ?? "", /Stopped cloak daemon/i)
 })
 
-test("main state destroy confirms, stops the daemon, and removes the config dir", async () => {
+test("main storage destroy confirms, stops the daemon, and removes the config dir", async () => {
   const appPaths = createAppPaths()
   fs.mkdirSync(appPaths.configDir, { recursive: true })
   fs.mkdirSync(path.dirname(appPaths.daemonLogPath), { recursive: true })
@@ -497,10 +497,10 @@ test("main state destroy confirms, stops the daemon, and removes the config dir"
 
   assert.deepEqual(stoppedPids, [4242])
   assert.equal(fs.existsSync(appPaths.configDir), false)
-  assert.match(logger.lines[0] ?? "", /Destroyed cloak state under/)
+  assert.match(logger.lines[0] ?? "", /Destroyed cloak storage under/)
 })
 
-test("main restart reuses the last daemon command", async () => {
+test("main daemon restart reuses the last daemon command", async () => {
   const appPaths = createAppPaths()
   fs.mkdirSync(appPaths.configDir, { recursive: true })
   const stateDb = new CloakStateDb(appPaths.stateDbPath)
