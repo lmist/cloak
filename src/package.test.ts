@@ -78,8 +78,7 @@ test("package metadata exposes the cloak binary and current runtime contract", (
   assert.ok(packageJson.dependencies?.tsx)
   assert.ok(packageJson.dependencies?.chalk)
   assert.ok(packageJson.dependencies?.yargs)
-  assert.ok(packageJson.optionalDependencies?.["chrome-cookies-secure"])
-  assert.equal(packageJson.optionalDependencies?.sqlite3, undefined)
+  assert.equal(packageJson.optionalDependencies, undefined)
   assert.ok(packageJson.devDependencies?.typescript)
   assert.ok(packageJson.devDependencies?.["@types/node"])
 })
@@ -149,6 +148,7 @@ test("readme documents the current CLI surface", () => {
   assert.match(readme, /~\/\.config\/cloak\/state\.sqlite/)
   assert.doesNotMatch(readme, /--cookies-from-browser/)
   assert.doesNotMatch(readme, /chrome-site-picker/)
+  assert.doesNotMatch(readme, /chrome-cookies-secure/)
 })
 
 test("generated README.md exists and is marked as generated", () => {

@@ -159,6 +159,6 @@ cloak --help
 
 # one sharp edge
 
-Chrome cookie extraction depends on `chrome-cookies-secure`, and that tool can collapse same-name cookies across different paths or subdomains before `cloak` sees them. If a login still fails after injection, that is the first thing to suspect.
+Chrome cookie extraction now uses `cloak`'s in-tree reader instead of the old external helper. That removes the install-time native dependency warnings and preserves distinct same-name cookies across different paths and subdomains.
 
-If `cloak run --cookie-url https://x.com` tells you Chrome cookie support is unavailable, reinstall in an environment where the optional native dependency chain can be built successfully.
+The sharp edge that remains is platform crypto. `cloak` still has to ask the OS for the key Chrome uses to encrypt cookies. If `cloak run --cookie-url https://x.com` tells you Chrome cookie support is unavailable, it could not reach that secret storage in the current environment. On Windows, Chrome app-bound cookie encryption is not supported yet.
