@@ -2,67 +2,77 @@ import yargs, { type Argv, type ArgumentsCamelCase } from "yargs"
 import { formatHeading } from "./output.js"
 
 type HelpMode = {
-  mode: "help";
-  text: string;
-};
+  mode: "help"
+  text: string
+}
+
+type VersionMode = {
+  mode: "version"
+}
 
 export type RunModeConfig = {
-  mode: "run";
-  headless: boolean;
-  daemon: boolean;
-  persistCookies: boolean;
-  consent: boolean;
-  profile?: string;
-  cookieUrls: string[];
-};
+  mode: "run"
+  headless: boolean
+  daemon: boolean
+  persistCookies: boolean
+  consent: boolean
+  profile?: string
+  cookieUrls: string[]
+}
 
 type StopMode = {
-  mode: "stop";
-};
+  mode: "stop"
+}
 
 type RestartMode = {
-  mode: "restart";
-};
+  mode: "restart"
+}
 
 type InspectMode = {
-  mode: "inspect";
-};
+  mode: "inspect"
+}
+
+type DaemonLogsMode = {
+  mode: "daemon-logs"
+}
 
 type StateDisplayMode = {
-  mode: "state-display";
-};
+  mode: "state-display"
+}
 
 type StateDestroyMode = {
-  mode: "state-destroy";
-};
+  mode: "state-destroy"
+}
 
 type ListProfilesMode = {
-  mode: "list-profiles";
-};
+  mode: "list-profiles"
+}
 
 type ProfilesStatusMode = {
-  mode: "profiles-status";
-};
+  mode: "profiles-status"
+}
 
 type ProfilesSetDefaultMode = {
-  mode: "profiles-set-default";
-  profile: string;
-  consent: boolean;
-};
+  mode: "profiles-set-default"
+  profile: string
+  consent: boolean
+}
 
 type CookiesListMode = {
-  mode: "cookies-list";
-  limit: number;
-  noPager: boolean;
-  consent: boolean;
-};
+  mode: "cookies-list"
+  limit: number
+  noPager: boolean
+  consent: boolean
+}
 
 type CliConfig =
   | HelpMode
+  | VersionMode
   | RunModeConfig
   | StopMode
   | RestartMode
   | InspectMode
+  | DaemonLogsMode
   | StateDisplayMode
   | StateDestroyMode
   | ListProfilesMode
@@ -123,23 +133,36 @@ function createParser(args: string[], scriptName: string): Argv {
     })
 }
 
+function isHelpFlag(value: string | undefined): boolean {
+  return value === "-h" || value === "--help"
+}
+
 function rootEpilog(): string {
   return `${formatHeading("Examples:")}
-  cloak profiles list
-  cloak profiles set default "Profile 7"
-  cloak cookies list
+  cloak profile list
+  cloak profile use "Profile 7"
+  cloak profile show
+  cloak sites list
   cloak run
-  cloak run --persist-cookies --consent --cookie-url https://x.com
-  cloak run --profile "Profile 7" --persist-cookies --consent --cookie-url https://x.com
-  cloak run --daemon
-  cloak inspect
-  cloak stop
-  cloak state display
-  cloak state destroy
+  cloak daemon start --profile "Profile 7" --persist-cookies --consent --cookie-url https://x.com
+  cloak daemon status
+  cloak daemon logs
+  cloak storage show
+  cloak storage destroy
+  cloak version
+
+${formatHeading("Legacy aliases:")}
+  cloak run --daemon          alias for cloak daemon start
+  cloak inspect               alias for cloak daemon status
+  cloak stop                  alias for cloak daemon stop
+  cloak restart               alias for cloak daemon restart
+  cloak profiles ...          alias for cloak profile ...
+  cloak cookies list          alias for cloak sites list
+  cloak state ...             alias for cloak storage ...
 
 ${formatHeading("Storage:")}
   cloak stores state in ~/.config/cloak/state.sqlite
-  cloak caches the pinned OpenCLI extension under ~/.cache/cloak/
+  cloak stores daemon logs and the pinned OpenCLI extension under ~/.cache/cloak/
 `
 }
 
@@ -147,12 +170,11 @@ function buildRootProgram(args: string[] = []): Argv {
   return createParser(args, "cloak")
     .usage("$0 <command>")
     .command("run", "launch Patchright headless by default")
-    .command("stop", "stop the cloak daemon")
-    .command("restart", "restart the cloak daemon")
-    .command("inspect", "inspect the cloak daemon")
-    .command("state", "inspect or destroy cloak state")
-    .command("profiles", "manage Chrome profiles")
-    .command("cookies", "list Chrome cookie URLs")
+    .command("daemon", "start, inspect, stop, restart, or tail the managed daemon")
+    .command("profile", "list, show, or select a Chrome profile")
+    .command("sites", "list cookie-bearing site URLs for the active profile")
+    .command("storage", "inspect or destroy cloak state")
+    .command("version", "print the installed cloak version")
     .epilog(rootEpilog())
 }
 
@@ -160,19 +182,23 @@ function rootHelpText(): string {
   return `Usage: cloak <command>
 
 Commands:
-  cloak run                          launch Patchright headless by default
-  cloak stop                         stop the cloak daemon
-  cloak restart                      restart the cloak daemon
-  cloak inspect                      inspect the cloak daemon
-  cloak state display                show the cloak state paths
-  cloak state destroy                destroy cloak state after confirmation
-  cloak profiles list                list available Chrome profiles
-  cloak profiles status              show the saved default Chrome profile
-  cloak profiles set default <name>  save the default Chrome profile
-  cloak cookies list                 list Chrome cookie URLs for the default profile
+  cloak run                           launch Patchright headless by default
+  cloak daemon start                  start the managed daemon
+  cloak daemon status                 inspect the managed daemon
+  cloak daemon stop                   stop the managed daemon
+  cloak daemon restart                restart the managed daemon
+  cloak daemon logs                   print the managed daemon log
+  cloak profile list                  list available Chrome profiles
+  cloak profile show                  show the saved default Chrome profile
+  cloak profile use <name>            save the default Chrome profile
+  cloak sites list                    list Chrome cookie URLs for the active profile
+  cloak storage show                  show the cloak state paths
+  cloak storage destroy               destroy cloak state after confirmation
+  cloak version                       print the installed cloak version
 
 Options:
-  -h, --help                         Show help
+  -h, --help                          Show help
+  -v, --version                       Show version
 
 ${rootEpilog()}`
 }
@@ -181,9 +207,11 @@ function runEpilog(): string {
   return `${formatHeading("Examples:")}
   cloak run
   cloak run --window
-  cloak run --daemon
   cloak run --cookie-url https://x.com --profile "Profile 7"
   cloak run --persist-cookies --consent --cookie-url https://x.com
+
+${formatHeading("Related:")}
+  cloak daemon start [same options as run]
 
 ${formatHeading("Storage:")}
   --persist-cookies remembers cookie URLs for the chosen profile
@@ -201,7 +229,7 @@ function buildRunProgram(args: string[] = []): Argv {
     .option("daemon", {
       alias: "d",
       type: "boolean",
-      description: "run in the background and manage it with stop/restart/inspect",
+      description: "run in the background and manage it with daemon status/stop/restart",
     })
     .option("profile", {
       type: "string",
@@ -250,96 +278,118 @@ Options:
 ${runEpilog()}`
 }
 
-function buildProfilesProgram(args: string[] = []): Argv {
-  return createParser(args, "cloak profiles")
+function buildDaemonProgram(args: string[] = []): Argv {
+  return createParser(args, "cloak daemon")
+    .usage("$0 <command>")
+    .command("start", "start the managed daemon")
+    .command("status", "inspect the managed daemon")
+    .command("stop", "stop the managed daemon")
+    .command("restart", "restart the managed daemon")
+    .command("logs", "print the managed daemon log")
+}
+
+function daemonHelpText(): string {
+  return `Usage: cloak daemon <command>
+
+Commands:
+  cloak daemon start      start the managed daemon
+  cloak daemon status     inspect the managed daemon
+  cloak daemon stop       stop the managed daemon
+  cloak daemon restart    restart the managed daemon
+  cloak daemon logs       print the managed daemon log
+
+Options:
+  -h, --help              Show help
+`
+}
+
+function buildDaemonStartProgram(args: string[] = []): Argv {
+  return createParser(args, "cloak daemon start")
+    .usage("$0 [options]")
+    .option("window", {
+      alias: "w",
+      type: "boolean",
+      description: "open a visible browser window",
+    })
+    .option("profile", {
+      type: "string",
+      description: "Chrome profile directory name",
+    })
+    .option("cookie-url", {
+      type: "string",
+      array: true,
+      description: "HTTP(S) site URL to import cookies from",
+      coerce: normalizeUrls,
+    })
+    .option("persist-cookies", {
+      type: "boolean",
+      description: "remember the provided --cookie-url values for this profile",
+    })
+    .option("consent", {
+      type: "boolean",
+      description: "create ~/.config/cloak without prompting",
+    })
+    .check((options: ArgumentsCamelCase<Record<string, unknown>>) => {
+      const cookieUrls = Array.isArray(options.cookieUrl)
+        ? (options.cookieUrl as string[])
+        : []
+
+      if (options.persistCookies && cookieUrls.length === 0) {
+        throw new Error("--persist-cookies requires at least one --cookie-url")
+      }
+
+      return true
+    })
+}
+
+function daemonStartHelpText(): string {
+  return `Usage: cloak daemon start [options]
+
+Options:
+  -h, --help               Show help
+  -w, --window             open a visible browser window
+  --profile <profile>      Chrome profile directory name
+  --cookie-url <url>       HTTP(S) site URL to import cookies from
+  --persist-cookies        remember the provided --cookie-url values
+  --consent                create ~/.config/cloak without prompting
+`
+}
+
+function buildZeroArgProgram(args: string[] = [], scriptName: string): Argv {
+  return createParser(args, scriptName).usage("$0")
+}
+
+function zeroArgHelpText(usage: string): string {
+  return `Usage: ${usage}
+
+Options:
+  -h, --help  Show help
+`
+}
+
+function buildProfileProgram(args: string[] = []): Argv {
+  return createParser(args, "cloak profile")
     .usage("$0 <command>")
     .command("list", "list available Chrome profiles")
-    .command("status", "show the saved default Chrome profile")
-    .command("set default <profile>", "save the default Chrome profile")
+    .command("show", "show the saved default Chrome profile")
+    .command("use <profile>", "save the default Chrome profile")
 }
 
-function buildStateProgram(args: string[] = []): Argv {
-  return createParser(args, "cloak state")
-    .usage("$0 <command>")
-    .command("display", "show the cloak state paths")
-    .command("destroy", "destroy cloak state after confirmation")
-}
-
-function stateHelpText(): string {
-  return `Usage: cloak state <command>
+function profileHelpText(): string {
+  return `Usage: cloak profile <command>
 
 Commands:
-  cloak state display  show the cloak state paths
-  cloak state destroy  destroy cloak state after confirmation
+  cloak profile list         list available Chrome profiles
+  cloak profile show         show the saved default Chrome profile
+  cloak profile use <name>   save the default Chrome profile
 
 Options:
-  -h, --help           Show help
+  -h, --help                 Show help
 `
 }
 
-function buildStateDisplayProgram(args: string[] = []): Argv {
-  return createParser(args, "cloak state display").usage("$0")
-}
-
-function stateDisplayHelpText(): string {
-  return `Usage: cloak state display
-
-Options:
-  -h, --help  Show help
-`
-}
-
-function buildStateDestroyProgram(args: string[] = []): Argv {
-  return createParser(args, "cloak state destroy").usage("$0")
-}
-
-function stateDestroyHelpText(): string {
-  return `Usage: cloak state destroy
-
-Options:
-  -h, --help  Show help
-`
-}
-
-function profilesHelpText(): string {
-  return `Usage: cloak profiles <command>
-
-Commands:
-  cloak profiles list                list available Chrome profiles
-  cloak profiles status              show the saved default Chrome profile
-  cloak profiles set default <name>  save the default Chrome profile
-
-Options:
-  -h, --help                         Show help
-`
-}
-
-function buildListProfilesProgram(args: string[] = []): Argv {
-  return createParser(args, "cloak profiles list").usage("$0")
-}
-
-function listProfilesHelpText(): string {
-  return `Usage: cloak profiles list
-
-Options:
-  -h, --help  Show help
-`
-}
-
-function buildProfilesStatusProgram(args: string[] = []): Argv {
-  return createParser(args, "cloak profiles status").usage("$0")
-}
-
-function profilesStatusHelpText(): string {
-  return `Usage: cloak profiles status
-
-Options:
-  -h, --help  Show help
-`
-}
-
-function buildProfilesSetDefaultProgram(args: string[] = []): Argv {
-  return createParser(args, "cloak profiles set default")
+function buildProfileUseProgram(args: string[] = []): Argv {
+  return createParser(args, "cloak profile use")
     .usage("$0 <profile> [options]")
     .option("consent", {
       type: "boolean",
@@ -347,8 +397,8 @@ function buildProfilesSetDefaultProgram(args: string[] = []): Argv {
     })
 }
 
-function profilesSetDefaultHelpText(): string {
-  return `Usage: cloak profiles set default <profile> [options]
+function profileUseHelpText(): string {
+  return `Usage: cloak profile use <profile> [options]
 
 Options:
   -h, --help     Show help
@@ -356,25 +406,25 @@ Options:
 `
 }
 
-function buildCookiesProgram(args: string[] = []): Argv {
-  return createParser(args, "cloak cookies")
+function buildSitesProgram(args: string[] = []): Argv {
+  return createParser(args, "cloak sites")
     .usage("$0 <command>")
-    .command("list", "list Chrome cookie URLs for the default profile")
+    .command("list", "list Chrome cookie URLs for the active profile")
 }
 
-function cookiesHelpText(): string {
-  return `Usage: cloak cookies <command>
+function sitesHelpText(): string {
+  return `Usage: cloak sites <command>
 
 Commands:
-  cloak cookies list  list Chrome cookie URLs for the default profile
+  cloak sites list  list Chrome cookie URLs for the active profile
 
 Options:
-  -h, --help          Show help
+  -h, --help        Show help
 `
 }
 
-function buildCookiesListProgram(args: string[] = []): Argv {
-  return createParser(args, "cloak cookies list")
+function buildSitesListProgram(args: string[] = []): Argv {
+  return createParser(args, "cloak sites list")
     .usage("$0 [options]")
     .option("pager", {
       type: "boolean",
@@ -394,8 +444,8 @@ function buildCookiesListProgram(args: string[] = []): Argv {
     })
 }
 
-function cookiesListHelpText(): string {
-  return `Usage: cloak cookies list [options]
+function sitesListHelpText(): string {
+  return `Usage: cloak sites list [options]
 
 Options:
   -h, --help           Show help
@@ -405,16 +455,35 @@ Options:
 `
 }
 
+function buildStorageProgram(args: string[] = []): Argv {
+  return createParser(args, "cloak storage")
+    .usage("$0 <command>")
+    .command("show", "show the cloak state paths")
+    .command("destroy", "destroy cloak state after confirmation")
+}
+
+function storageHelpText(): string {
+  return `Usage: cloak storage <command>
+
+Commands:
+  cloak storage show     show the cloak state paths
+  cloak storage destroy  destroy cloak state after confirmation
+
+Options:
+  -h, --help             Show help
+`
+}
+
 function parseRunMode(args: string[]): CliConfig {
   const parser = buildRunProgram(args)
   const options = parser.parseSync() as {
-    help?: boolean;
-    window?: boolean;
-    daemon?: boolean;
-    profile?: string;
-    cookieUrl?: string[];
-    persistCookies?: boolean;
-    consent?: boolean;
+    help?: boolean
+    window?: boolean
+    daemon?: boolean
+    profile?: string
+    cookieUrl?: string[]
+    persistCookies?: boolean
+    consent?: boolean
   }
 
   if (options.help) {
@@ -435,23 +504,52 @@ function parseRunMode(args: string[]): CliConfig {
   }
 }
 
-function parseProfilesSetDefaultMode(args: string[]): CliConfig {
+function parseDaemonStartMode(args: string[]): CliConfig {
+  const parser = buildDaemonStartProgram(args)
+  const options = parser.parseSync() as {
+    help?: boolean
+    window?: boolean
+    profile?: string
+    cookieUrl?: string[]
+    persistCookies?: boolean
+    consent?: boolean
+  }
+
+  if (options.help) {
+    return {
+      mode: "help",
+      text: daemonStartHelpText(),
+    }
+  }
+
+  return {
+    mode: "run",
+    headless: !Boolean(options.window),
+    daemon: true,
+    persistCookies: Boolean(options.persistCookies),
+    consent: Boolean(options.consent),
+    profile: options.profile,
+    cookieUrls: options.cookieUrl ?? [],
+  }
+}
+
+function parseProfileUseMode(args: string[]): CliConfig {
   const profile = String(args[0] ?? "").trim()
 
   if (!profile) {
     throw new Error("profile is required")
   }
 
-  const parser = buildProfilesSetDefaultProgram(args.slice(1))
+  const parser = buildProfileUseProgram(args.slice(1))
   const options = parser.parseSync() as {
-    help?: boolean;
-    consent?: boolean;
+    help?: boolean
+    consent?: boolean
   }
 
   if (options.help) {
     return {
       mode: "help",
-      text: profilesSetDefaultHelpText(),
+      text: profileUseHelpText(),
     }
   }
 
@@ -462,20 +560,20 @@ function parseProfilesSetDefaultMode(args: string[]): CliConfig {
   }
 }
 
-function parseCookiesListMode(args: string[]): CliConfig {
+function parseSitesListMode(args: string[]): CliConfig {
   const normalizedArgs = args.map((arg) => (arg === "-n" ? "--no-pager" : arg))
-  const parser = buildCookiesListProgram(normalizedArgs)
+  const parser = buildSitesListProgram(normalizedArgs)
   const options = parser.parseSync() as {
-    help?: boolean;
-    pager?: boolean;
-    limit?: number;
-    consent?: boolean;
+    help?: boolean
+    pager?: boolean
+    limit?: number
+    consent?: boolean
   }
 
   if (options.help) {
     return {
       mode: "help",
-      text: cookiesListHelpText(),
+      text: sitesListHelpText(),
     }
   }
 
@@ -495,15 +593,21 @@ function parseRootMode(args: string[]): never {
 export function parseCli(argv: string[]): CliConfig {
   const args = argv.slice(2)
 
-  if (args.length === 0 || args[0] === "-h" || args[0] === "--help") {
+  if (args.length === 0 || isHelpFlag(args[0])) {
     return {
       mode: "help",
       text: rootHelpText(),
     }
   }
 
+  if (args[0] === "-v" || args[0] === "--version" || args[0] === "version") {
+    return {
+      mode: "version",
+    }
+  }
+
   if (args[0] === "run") {
-    if (args.length === 2 && (args[1] === "-h" || args[1] === "--help")) {
+    if (args.length === 2 && isHelpFlag(args[1])) {
       return {
         mode: "help",
         text: runHelpText(),
@@ -511,6 +615,81 @@ export function parseCli(argv: string[]): CliConfig {
     }
 
     return parseRunMode(args.slice(1))
+  }
+
+  if (args[0] === "daemon") {
+    if (args.length === 1 || isHelpFlag(args[1])) {
+      return {
+        mode: "help",
+        text: daemonHelpText(),
+      }
+    }
+
+    if (args[1] === "start") {
+      if (args.length === 3 && isHelpFlag(args[2])) {
+        return {
+          mode: "help",
+          text: daemonStartHelpText(),
+        }
+      }
+
+      return parseDaemonStartMode(args.slice(2))
+    }
+
+    if (args[1] === "status") {
+      if (args.length === 3 && isHelpFlag(args[2])) {
+        return {
+          mode: "help",
+          text: zeroArgHelpText("cloak daemon status"),
+        }
+      }
+
+      buildZeroArgProgram(args.slice(2), "cloak daemon status").parseSync()
+      return { mode: "inspect" }
+    }
+
+    if (args[1] === "stop") {
+      if (args.length === 3 && isHelpFlag(args[2])) {
+        return {
+          mode: "help",
+          text: zeroArgHelpText("cloak daemon stop"),
+        }
+      }
+
+      buildZeroArgProgram(args.slice(2), "cloak daemon stop").parseSync()
+      return { mode: "stop" }
+    }
+
+    if (args[1] === "restart") {
+      if (args.length === 3 && isHelpFlag(args[2])) {
+        return {
+          mode: "help",
+          text: zeroArgHelpText("cloak daemon restart"),
+        }
+      }
+
+      buildZeroArgProgram(args.slice(2), "cloak daemon restart").parseSync()
+      return { mode: "restart" }
+    }
+
+    if (args[1] === "logs") {
+      if (args.length === 3 && isHelpFlag(args[2])) {
+        return {
+          mode: "help",
+          text: zeroArgHelpText("cloak daemon logs"),
+        }
+      }
+
+      buildZeroArgProgram(args.slice(2), "cloak daemon logs").parseSync()
+      return { mode: "daemon-logs" }
+    }
+
+    buildDaemonProgram(args.slice(1)).parseSync()
+    throw new Error("daemon parsing should not return")
+  }
+
+  if (args[0] === "inspect") {
+    return { mode: "inspect" }
   }
 
   if (args[0] === "stop") {
@@ -521,116 +700,121 @@ export function parseCli(argv: string[]): CliConfig {
     return { mode: "restart" }
   }
 
-  if (args[0] === "inspect") {
-    return { mode: "inspect" }
-  }
-
-  if (args[0] === "state") {
-    if (args.length === 1 || args[1] === "-h" || args[1] === "--help") {
+  if (args[0] === "storage" || args[0] === "state") {
+    if (args.length === 1 || isHelpFlag(args[1])) {
       return {
         mode: "help",
-        text: stateHelpText(),
+        text: storageHelpText(),
       }
     }
 
-    if (args[1] === "display") {
-      if (args.length === 3 && (args[2] === "-h" || args[2] === "--help")) {
+    if (args[1] === "show" || args[1] === "display") {
+      if (args.length === 3 && isHelpFlag(args[2])) {
         return {
           mode: "help",
-          text: stateDisplayHelpText(),
+          text: zeroArgHelpText("cloak storage show"),
         }
       }
 
-      buildStateDisplayProgram(args.slice(2)).parseSync()
+      buildZeroArgProgram(args.slice(2), "cloak storage show").parseSync()
       return { mode: "state-display" }
     }
 
     if (args[1] === "destroy") {
-      if (args.length === 3 && (args[2] === "-h" || args[2] === "--help")) {
+      if (args.length === 3 && isHelpFlag(args[2])) {
         return {
           mode: "help",
-          text: stateDestroyHelpText(),
+          text: zeroArgHelpText("cloak storage destroy"),
         }
       }
 
-      buildStateDestroyProgram(args.slice(2)).parseSync()
+      buildZeroArgProgram(args.slice(2), "cloak storage destroy").parseSync()
       return { mode: "state-destroy" }
     }
 
-    buildStateProgram(args.slice(1)).parseSync()
-    throw new Error("state parsing should not return")
+    buildStorageProgram(args.slice(1)).parseSync()
+    throw new Error("storage parsing should not return")
   }
 
-  if (args[0] === "profiles") {
-    if (args.length === 1 || args[1] === "-h" || args[1] === "--help") {
+  if (args[0] === "profile" || args[0] === "profiles") {
+    if (args.length === 1 || isHelpFlag(args[1])) {
       return {
         mode: "help",
-        text: profilesHelpText(),
+        text: profileHelpText(),
       }
     }
 
     if (args[1] === "list") {
-      if (args.length === 3 && (args[2] === "-h" || args[2] === "--help")) {
+      if (args.length === 3 && isHelpFlag(args[2])) {
         return {
           mode: "help",
-          text: listProfilesHelpText(),
+          text: zeroArgHelpText("cloak profile list"),
         }
       }
 
-      buildListProfilesProgram(args.slice(2)).parseSync()
+      buildZeroArgProgram(args.slice(2), "cloak profile list").parseSync()
       return { mode: "list-profiles" }
     }
 
-    if (args[1] === "status") {
-      if (args.length === 3 && (args[2] === "-h" || args[2] === "--help")) {
+    if (args[1] === "show" || args[1] === "status") {
+      if (args.length === 3 && isHelpFlag(args[2])) {
         return {
           mode: "help",
-          text: profilesStatusHelpText(),
+          text: zeroArgHelpText("cloak profile show"),
         }
       }
 
-      buildProfilesStatusProgram(args.slice(2)).parseSync()
+      buildZeroArgProgram(args.slice(2), "cloak profile show").parseSync()
       return { mode: "profiles-status" }
     }
 
-    if (args[1] === "set") {
-      if (args[2] === "default") {
-        if (args.length === 4 && (args[3] === "-h" || args[3] === "--help")) {
-          return {
-            mode: "help",
-            text: profilesSetDefaultHelpText(),
-          }
+    if (args[1] === "use") {
+      if (args.length === 3 && isHelpFlag(args[2])) {
+        return {
+          mode: "help",
+          text: profileUseHelpText(),
         }
-
-        return parseProfilesSetDefaultMode(args.slice(3))
       }
+
+      return parseProfileUseMode(args.slice(2))
     }
 
-    buildProfilesProgram(args.slice(1)).parseSync()
-    throw new Error("profiles parsing should not return")
+    if (args[1] === "set" && args[2] === "default") {
+      if (args.length === 4 && isHelpFlag(args[3])) {
+        return {
+          mode: "help",
+          text: profileUseHelpText(),
+        }
+      }
+
+      return parseProfileUseMode(args.slice(3))
+    }
+
+    buildProfileProgram(args.slice(1)).parseSync()
+    throw new Error("profile parsing should not return")
   }
 
-  if (args[0] === "cookies") {
-    if (args.length === 1 || args[1] === "-h" || args[1] === "--help") {
+  if (args[0] === "sites" || args[0] === "cookies") {
+    if (args.length === 1 || isHelpFlag(args[1])) {
       return {
         mode: "help",
-        text: cookiesHelpText(),
+        text: sitesHelpText(),
       }
     }
 
     if (args[1] === "list") {
-      if (args.length === 3 && (args[2] === "-h" || args[2] === "--help")) {
+      if (args.length === 3 && isHelpFlag(args[2])) {
         return {
           mode: "help",
-          text: cookiesListHelpText(),
+          text: sitesListHelpText(),
         }
       }
 
-      return parseCookiesListMode(args.slice(2))
+      return parseSitesListMode(args.slice(2))
     }
 
-    buildCookiesProgram(args.slice(1)).parseSync()
-    throw new Error("cookies parsing should not return")
+    buildSitesProgram(args.slice(1)).parseSync()
+    throw new Error("sites parsing should not return")
   }
 
   return parseRootMode(args)

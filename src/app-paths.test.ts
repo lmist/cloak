@@ -21,7 +21,7 @@ test("resolveAppPaths uses the cache root as the extension cache directory", () 
     extensionsDir: "/tmp/cloak",
     configDir: "/tmp/cloak-config",
     stateDbPath: "/tmp/cloak-config/state.sqlite",
-    daemonLogPath: "/tmp/cloak-config/daemon.log",
+    daemonLogPath: "/tmp/cloak/daemon.log",
   })
 })
 

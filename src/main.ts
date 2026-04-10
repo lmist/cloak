@@ -75,6 +75,7 @@ type MainDependencies = ResolveStartupCookiesDependencies & {
   makeTempDir?: (prefix: string) => string;
   makeDir?: (path: string, options: { recursive: true }) => void;
   removeDir?: (path: string, options: { recursive: true; force: true }) => void;
+  readFile?: (path: string, encoding: "utf8") => string;
   writeFile?: (path: string, data: string) => void;
   pathExists?: (path: string) => boolean;
   writeStdout?: (message: string) => void;
@@ -209,6 +210,19 @@ export async function resolveStartupCookies(
   return dedupeCookies(importedCookies)
 }
 
+function readPackageVersion(): string {
+  const packageJsonPath = path.resolve(__dirname, "..", "package.json")
+  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8")) as {
+    version?: string
+  }
+
+  if (!packageJson.version) {
+    throw new Error("Unable to determine cloak version from package.json")
+  }
+
+  return packageJson.version
+}
+
 export async function main(
   argv: string[] = process.argv,
   dependencies: MainDependencies = {}
@@ -222,6 +236,11 @@ export async function main(
 
   if (cli.mode === "help") {
     writeStdout(cli.text)
+    return
+  }
+
+  if (cli.mode === "version") {
+    log(readPackageVersion())
     return
   }
 
@@ -267,6 +286,11 @@ export async function main(
     return
   }
 
+  if (cli.mode === "daemon-logs") {
+    handleDaemonLogs(appPaths, log, dependencies)
+    return
+  }
+
   if (cli.mode === "state-display") {
     handleStateDisplay(appPaths, log, dependencies)
     return
@@ -292,6 +316,7 @@ export async function main(
   log(runSummary)
 
   if (resolvedCli.daemon) {
+    await rememberCookieUrls(resolvedCli, appPaths, log, dependencies)
     await handleDaemonRun(resolvedCli, appPaths, log, dependencies)
     return
   }
@@ -427,6 +452,31 @@ function handleInspect(
   }
 
   log(formatDaemonState(daemon))
+}
+
+function handleDaemonLogs(
+  appPaths: AppPaths,
+  log: (message: string) => void,
+  dependencies: Pick<MainDependencies, "pathExists" | "readFile">
+) {
+  const pathExists = dependencies.pathExists ?? fs.existsSync
+
+  if (!pathExists(appPaths.daemonLogPath)) {
+    log(`No daemon log found at ${appPaths.daemonLogPath}.`)
+    return
+  }
+
+  const readFile =
+    dependencies.readFile ??
+    ((targetPath: string, encoding: "utf8") => fs.readFileSync(targetPath, encoding))
+  const contents = readFile(appPaths.daemonLogPath, "utf8").replace(/\n$/, "")
+
+  if (contents.length === 0) {
+    log(`Daemon log is empty: ${appPaths.daemonLogPath}`)
+    return
+  }
+
+  log(contents)
 }
 
 function handleStateDisplay(
@@ -675,6 +725,7 @@ async function startDaemon(
   const makeDir = dependencies.makeDir ?? fs.mkdirSync
   const now = dependencies.now ?? (() => new Date())
   makeDir(appPaths.configDir, { recursive: true })
+  makeDir(path.dirname(appPaths.daemonLogPath), { recursive: true })
   const pid = spawnDaemonProcessFn({
     execPath: dependencies.processExecPath ?? process.execPath,
     execArgv: dependencies.processExecArgv ?? process.execArgv,

@@ -127,7 +127,7 @@ test("main saves the default profile", async () => {
   const logger = createLogCollector()
 
   await main(
-    ["node", "dist/main.js", "profiles", "set", "default", "Profile 7"],
+    ["node", "dist/main.js", "profile", "use", "Profile 7"],
     {
       appPaths,
       log: logger.log,
@@ -145,10 +145,23 @@ test("main saves the default profile", async () => {
   assert.match(logger.lines[0] ?? "", /saved default profile/i)
 })
 
+test("main prints the installed version", async () => {
+  const logger = createLogCollector()
+  const packageJson = JSON.parse(fs.readFileSync(path.resolve("package.json"), "utf8")) as {
+    version: string
+  }
+
+  await main(["node", "dist/main.js", "version"], {
+    log: logger.log,
+  })
+
+  assert.equal(logger.lines[0], packageJson.version)
+})
+
 test("main lists Chrome profiles with friendly labels", async () => {
   const logger = createLogCollector()
 
-  await main(["node", "dist/main.js", "profiles", "list"], {
+  await main(["node", "dist/main.js", "profile", "list"], {
     log: logger.log,
     hasChromeUserDataDir: () => true,
     listChromeProfiles: () => [
@@ -166,7 +179,7 @@ test("main lists Chrome profiles with friendly labels", async () => {
 test("main omits duplicate labels when a profile name matches its directory", async () => {
   const logger = createLogCollector()
 
-  await main(["node", "dist/main.js", "profiles", "list"], {
+  await main(["node", "dist/main.js", "profile", "list"], {
     log: logger.log,
     hasChromeUserDataDir: () => true,
     listChromeProfiles: () => [
@@ -182,7 +195,7 @@ test("main refuses to list cookies without a saved default profile", async () =>
   const logger = createLogCollector()
 
   await assert.rejects(
-    main(["node", "dist/main.js", "cookies", "list", "--no-pager"], {
+    main(["node", "dist/main.js", "sites", "list", "--no-pager"], {
       appPaths,
       log: logger.log,
     }),
@@ -198,7 +211,7 @@ test("main lists cookie URLs and remembers an interactive selection", async () =
   const logger = createLogCollector()
 
   await main(
-    ["node", "dist/main.js", "cookies", "list"],
+    ["node", "dist/main.js", "sites", "list"],
     {
       appPaths,
       log: logger.log,
@@ -318,8 +331,9 @@ test("main run in daemon mode stores daemon state", async () => {
     [
       "node",
       "dist/main.js",
-      "run",
-      "--daemon",
+      "daemon",
+      "start",
+      "--persist-cookies",
       "--cookie-url",
       "https://x.com",
     ],
@@ -335,6 +349,10 @@ test("main run in daemon mode stores daemon state", async () => {
   )
 
   assert.match(logger.lines.at(-1) ?? "", /Started cloak daemon \(4242\)/)
+  assert.equal(fs.existsSync(path.dirname(appPaths.daemonLogPath)), true)
+  assert.deepEqual(stateDb.getRememberedCookieUrls("Profile 7"), [
+    "https://x.com/",
+  ])
   assert.deepEqual(stateDb.getDaemonState(), {
     pid: 4242,
     headless: true,
@@ -359,7 +377,7 @@ test("main inspect reports the active daemon", async () => {
   })
   const logger = createLogCollector()
 
-  await main(["node", "dist/main.js", "inspect"], {
+  await main(["node", "dist/main.js", "daemon", "status"], {
     appPaths,
     log: logger.log,
     isProcessRunning: () => true,
@@ -367,6 +385,33 @@ test("main inspect reports the active daemon", async () => {
 
   assert.match(logger.lines[0] ?? "", /pid: 4242/)
   assert.match(logger.lines[0] ?? "", /status: running/)
+})
+
+test("main daemon logs prints the cached daemon log", async () => {
+  const appPaths = createAppPaths()
+  fs.mkdirSync(path.dirname(appPaths.daemonLogPath), { recursive: true })
+  fs.writeFileSync(appPaths.daemonLogPath, "line 1\nline 2\n")
+  const logger = createLogCollector()
+
+  await main(["node", "dist/main.js", "daemon", "logs"], {
+    appPaths,
+    log: logger.log,
+  })
+
+  assert.equal(logger.lines[0], "line 1\nline 2")
+})
+
+test("main daemon logs reports when no cached log exists", async () => {
+  const appPaths = createAppPaths()
+  const logger = createLogCollector()
+
+  await main(["node", "dist/main.js", "daemon", "logs"], {
+    appPaths,
+    log: logger.log,
+  })
+
+  assert.match(logger.lines[0] ?? "", /No daemon log found/i)
+  assert.match(logger.lines[0] ?? "", new RegExp(appPaths.daemonLogPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
 })
 
 test("main state display shows the sqlite path and current state summary", async () => {
@@ -384,7 +429,7 @@ test("main state display shows the sqlite path and current state summary", async
   })
   const logger = createLogCollector()
 
-  await main(["node", "dist/main.js", "state", "display"], {
+  await main(["node", "dist/main.js", "storage", "show"], {
     appPaths,
     log: logger.log,
     isProcessRunning: () => true,
@@ -409,7 +454,7 @@ test("main stop clears the saved daemon state", async () => {
   })
   const logger = createLogCollector()
 
-  await main(["node", "dist/main.js", "stop"], {
+  await main(["node", "dist/main.js", "daemon", "stop"], {
     appPaths,
     log: logger.log,
     isProcessRunning: () => true,
@@ -423,6 +468,7 @@ test("main stop clears the saved daemon state", async () => {
 test("main state destroy confirms, stops the daemon, and removes the config dir", async () => {
   const appPaths = createAppPaths()
   fs.mkdirSync(appPaths.configDir, { recursive: true })
+  fs.mkdirSync(path.dirname(appPaths.daemonLogPath), { recursive: true })
   const stateDb = new CloakStateDb(appPaths.stateDbPath)
   stateDb.setDaemonState({
     pid: 4242,
@@ -436,7 +482,7 @@ test("main state destroy confirms, stops the daemon, and removes the config dir"
   const logger = createLogCollector()
   const stoppedPids: number[] = []
 
-  await main(["node", "dist/main.js", "state", "destroy"], {
+  await main(["node", "dist/main.js", "storage", "destroy"], {
     appPaths,
     log: logger.log,
     stdinIsTTY: true,
@@ -465,7 +511,7 @@ test("main restart reuses the last daemon command", async () => {
   })
   const logger = createLogCollector()
 
-  await main(["node", "dist/main.js", "restart"], {
+  await main(["node", "dist/main.js", "daemon", "restart"], {
     appPaths,
     log: logger.log,
     spawnDaemonProcess: () => 5150,

@@ -34,6 +34,6 @@ export function resolveAppPaths(
     extensionsDir: rootDir,
     configDir,
     stateDbPath: path.join(configDir, "state.sqlite"),
-    daemonLogPath: path.join(configDir, "daemon.log"),
+    daemonLogPath: path.join(rootDir, "daemon.log"),
   };
 }

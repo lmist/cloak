@@ -63,19 +63,25 @@ npx skills add jackwener/opencli
 
 If you installed from a checkout but did not run `npm install -g .`, use `node dist/main.js` everywhere below in place of `cloak`.
 
+Check the installed version:
+
+``` bash
+cloak version
+```
+
 Pick a default Chrome profile once:
 
 ``` bash
-cloak profiles list
-cloak profiles set default "Profile 7"
-cloak profiles status
+cloak profile list
+cloak profile use "Profile 7"
+cloak profile show
 ```
 
 See the cookie-bearing URLs for the default profile and optionally remember a subset for future runs:
 
 ``` bash
-cloak cookies list
-cloak cookies list --no-pager --limit 25
+cloak sites list
+cloak sites list --no-pager --limit 25
 ```
 
 Run headless with the remembered profile and remembered URLs:
@@ -105,18 +111,21 @@ cloak run --profile "Profile 7" --persist-cookies --consent --cookie-url https:/
 Run as a daemon and manage it later:
 
 ``` bash
-cloak run --daemon
-cloak inspect
-cloak stop
-cloak restart
+cloak daemon start --profile "Profile 7" --persist-cookies --consent --cookie-url https://x.com
+cloak daemon status
+cloak daemon logs
+cloak daemon stop
+cloak daemon restart
 ```
 
 See where `cloak` keeps its state, then destroy it if you really mean it:
 
 ``` bash
-cloak state display
-cloak state destroy
+cloak storage show
+cloak storage destroy
 ```
+
+Legacy aliases still work if you already depend on them: `cloak run --daemon`, `cloak inspect`, `cloak stop`, `cloak restart`, `cloak profiles ...`, `cloak cookies list`, and `cloak state ...`.
 
 # runtime and storage
 
@@ -128,9 +137,9 @@ If you import Chrome cookies, `cloak` reads them live from the selected local Ch
 
 - `~/.cache/cloak/opencli-extension.zip`
 - `~/.config/cloak/state.sqlite` with the default profile, remembered cookie URLs, and daemon state
-- `~/.config/cloak/daemon.log` when you use `cloak run --daemon`
+- `~/.cache/cloak/daemon.log` when you use `cloak daemon start`
 
-Use `cloak state display` to print those paths, and `cloak state destroy` to remove the whole config tree after a confirmation prompt.
+Use `cloak storage show` to print those paths, and `cloak storage destroy` to remove the whole config tree after a confirmation prompt.
 
 \(2\) What stays ephemeral:
 

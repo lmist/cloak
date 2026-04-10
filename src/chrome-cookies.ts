@@ -19,7 +19,7 @@ type ChromePuppeteerCookie = {
   value: string
   domain: string
   path: string
-  expires: number
+  expires: number | bigint
   HttpOnly?: boolean
   Secure?: boolean
   sameSite?: string
@@ -46,6 +46,7 @@ type ChromeCookieDatabaseRow = {
 
 type StatementLike = {
   all(...parameters: string[]): Array<Record<string, unknown>>
+  setReadBigInts?(enabled: boolean): StatementLike
 }
 
 type DatabaseLike = {
@@ -116,11 +117,15 @@ function normalizeChromeCookie(raw: ChromePuppeteerCookie): Cookie {
     sameSite: raw.sameSite,
   } as Parameters<typeof normalizeCookie>[0] & { expires?: number }
 
-  if (raw.expires !== 0) {
+  if (!isZeroChromiumTimestamp(raw.expires)) {
     normalized.expires = chromiumTimestampToUnixSeconds(raw.expires)
   }
 
   return normalizeCookie(normalized)
+}
+
+function isZeroChromiumTimestamp(timestamp: number | bigint): boolean {
+  return typeof timestamp === "bigint" ? timestamp === 0n : timestamp === 0
 }
 
 export async function readChromeCookies(
@@ -258,9 +263,7 @@ function rowToPuppeteerCookie(
     value: resolvedValue,
     domain: row.host_key,
     path: row.path,
-    expires: typeof row.expires_utc === "bigint"
-      ? Number(row.expires_utc)
-      : row.expires_utc,
+    expires: row.expires_utc,
   }
 
   if (toBoolean(row.is_secure)) {
@@ -628,6 +631,7 @@ function queryChromeCookieRows(
         "ORDER BY LENGTH(path) DESC, creation_utc ASC",
       ].join(" ")
     )
+    statement.setReadBigInts?.(true)
 
     return statement.all(...hostKeys) as ChromeCookieDatabaseRow[]
   } finally {

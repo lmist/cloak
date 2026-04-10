@@ -1,6 +1,9 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { createCipheriv, createHash, pbkdf2Sync } from "node:crypto"
+import fs from "node:fs"
+import os from "node:os"
+import path from "node:path"
 import {
   CHROME_COOKIE_APP_BOUND_UNSUPPORTED_ERROR,
   candidateChromeCookieHosts,
@@ -385,4 +388,77 @@ test("createChromeCookieReader rejects Windows app-bound cookie encryption", asy
     ),
     new RegExp(CHROME_COOKIE_APP_BOUND_UNSUPPORTED_ERROR)
   )
+})
+
+test("readChromeCookies reads large Chromium integer timestamps through node:sqlite", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cloak-cookie-reader-"))
+  t.after(() => {
+    fs.rmSync(root, { recursive: true, force: true })
+  })
+
+  const chromeUserDataDir = path.join(root, "Chrome")
+  const profileDir = path.join(chromeUserDataDir, "Profile 7", "Network")
+  const cookieDbPath = path.join(profileDir, "Cookies")
+  fs.mkdirSync(profileDir, { recursive: true })
+
+  const { DatabaseSync } = require("node:sqlite") as {
+    DatabaseSync: new (targetPath: string) => {
+      close(): void
+      exec(sql: string): void
+    }
+  }
+  const database = new DatabaseSync(cookieDbPath)
+
+  try {
+    database.exec(
+      [
+        "CREATE TABLE cookies (",
+        "host_key TEXT NOT NULL,",
+        "path TEXT NOT NULL,",
+        "is_secure INTEGER NOT NULL,",
+        "expires_utc INTEGER NOT NULL,",
+        "name TEXT NOT NULL,",
+        "value TEXT NOT NULL,",
+        "encrypted_value BLOB,",
+        "creation_utc INTEGER NOT NULL,",
+        "is_httponly INTEGER NOT NULL,",
+        "samesite INTEGER",
+        ");",
+        "INSERT INTO cookies VALUES ('.instagram.com', '/', 1, 13450300143471040, 'datr', 'cookie-value', NULL, 1, 1, 1);",
+        "INSERT INTO cookies VALUES ('.instagram.com', '/', 1, 0, 'sessionid', 'session-value', NULL, 2, 0, -1);",
+      ].join(" ")
+    )
+  } finally {
+    database.close()
+  }
+
+  const cookies = await readChromeCookies(
+    {
+      url: "https://instagram.com",
+      profile: "Profile 7",
+    },
+    createChromeCookieReader({
+      chromeUserDataDir,
+    })
+  )
+
+  assert.deepEqual(cookies, [
+    {
+      name: "datr",
+      value: "cookie-value",
+      domain: ".instagram.com",
+      path: "/",
+      expires: 1805826543,
+      httpOnly: true,
+      secure: true,
+      sameSite: "Lax",
+    },
+    {
+      name: "sessionid",
+      value: "session-value",
+      domain: ".instagram.com",
+      path: "/",
+      secure: true,
+    },
+  ])
 })
