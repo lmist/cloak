@@ -324,7 +324,14 @@ async function handleListProfiles(
   const lines = ["Listing profiles for Chrome"]
 
   for (const profile of profiles) {
-    lines.push(`- ${profile.directory}`)
+    const label = profile.accountName ?? profile.name
+
+    if (!label || label === profile.directory) {
+      lines.push(`- ${profile.directory}`)
+      continue
+    }
+
+    lines.push(`- ${profile.directory} <${label}>`)
   }
 
   log(lines.join("\n"))

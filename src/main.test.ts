@@ -145,6 +145,38 @@ test("main saves the default profile", async () => {
   assert.match(logger.lines[0] ?? "", /saved default profile/i)
 })
 
+test("main lists Chrome profiles with friendly labels", async () => {
+  const logger = createLogCollector()
+
+  await main(["node", "dist/main.js", "profiles", "list"], {
+    log: logger.log,
+    hasChromeUserDataDir: () => true,
+    listChromeProfiles: () => [
+      { directory: "Default", name: "Person 1", accountName: "Louai Misto" },
+      { directory: "Profile 7", name: "fol4vol" },
+    ],
+  })
+
+  assert.equal(
+    logger.lines[0],
+    ["Listing profiles for Chrome", "- Default <Louai Misto>", "- Profile 7 <fol4vol>"].join("\n")
+  )
+})
+
+test("main omits duplicate labels when a profile name matches its directory", async () => {
+  const logger = createLogCollector()
+
+  await main(["node", "dist/main.js", "profiles", "list"], {
+    log: logger.log,
+    hasChromeUserDataDir: () => true,
+    listChromeProfiles: () => [
+      { directory: "Default", name: "Default" },
+    ],
+  })
+
+  assert.equal(logger.lines[0], ["Listing profiles for Chrome", "- Default"].join("\n"))
+})
+
 test("main refuses to list cookies without a saved default profile", async () => {
   const appPaths = createAppPaths()
   const logger = createLogCollector()
