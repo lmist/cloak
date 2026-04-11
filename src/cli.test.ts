@@ -50,6 +50,7 @@ test("parseCli parses run mode with headless enabled by default", () => {
     consent: false,
     profile: undefined,
     cookieUrls: [],
+    cookieFile: undefined,
   })
 })
 
@@ -77,6 +78,29 @@ test("parseCli parses daemon start with consent profile and cookie URLs", () => 
       consent: true,
       profile: "Profile 7",
       cookieUrls: ["https://x.com/", "https://github.com/"],
+      cookieFile: undefined,
+    }
+  )
+})
+
+test("parseCli parses a cookie file without requiring a profile", () => {
+  assert.deepEqual(
+    parseCli([
+      "node",
+      "dist/main.js",
+      "run",
+      "--cookie-file",
+      "./cookies.json",
+    ]),
+    {
+      mode: "run",
+      headless: true,
+      daemon: false,
+      persistCookies: false,
+      consent: false,
+      profile: undefined,
+      cookieUrls: [],
+      cookieFile: "./cookies.json",
     }
   )
 })

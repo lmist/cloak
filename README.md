@@ -96,6 +96,12 @@ Run visibly instead of headless:
 cloak run --window
 ```
 
+Run from a cookie export file without selecting a Chrome profile:
+
+``` bash
+cloak run --cookie-file ./cookies.json
+```
+
 Non-interactive path, using the saved default profile and remembering the URL without a prompt:
 
 ``` bash
@@ -130,6 +136,8 @@ cloak storage destroy
 `cloak` launches headless by default. Pass `--window` when you want a visible browser window.
 
 If you import Chrome cookies, `cloak` reads them live from the selected local Chrome profile at startup and injects them into the fresh browser context for that run.
+
+If you use `--cookie-file`, `cloak` reads cookies from a JSON file instead. It accepts either a plain JSON array of cookies or a Playwright storage-state JSON object with a top-level `cookies` array. That path does not require a Chrome profile.
 
 \(1\) What persists:
 

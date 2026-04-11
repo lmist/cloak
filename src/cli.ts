@@ -18,6 +18,7 @@ export type RunModeConfig = {
   consent: boolean
   profile?: string
   cookieUrls: string[]
+  cookieFile?: string
 }
 
 type DaemonStatusMode = {
@@ -103,6 +104,16 @@ function normalizeUrls(values: string | string[] | undefined): string[] {
   const normalized = urls.map(parseUrl)
 
   return [...new Set(normalized)]
+}
+
+function normalizeFilePath(value: string | undefined): string | undefined {
+  const normalized = value?.trim()
+
+  if (!normalized) {
+    return undefined
+  }
+
+  return normalized
 }
 
 function parseLimit(value: number): number {
@@ -198,6 +209,7 @@ function runEpilog(): string {
   return `${formatHeading("Examples:")}
   cloak run
   cloak run --window
+  cloak run --cookie-file ./cookies.json
   cloak run --cookie-url https://x.com --profile "Profile 7"
   cloak run --persist-cookies --consent --cookie-url https://x.com
 
@@ -226,6 +238,11 @@ function buildRunProgram(args: string[] = []): Argv {
       array: true,
       description: "HTTP(S) site URL to import cookies from",
       coerce: normalizeUrls,
+    })
+    .option("cookie-file", {
+      type: "string",
+      description: "JSON cookie export or Playwright storage-state file",
+      coerce: normalizeFilePath,
     })
     .option("persist-cookies", {
       type: "boolean",
@@ -257,6 +274,7 @@ Options:
   -w, --window             open a visible browser window
   --profile <profile>      Chrome profile directory name
   --cookie-url <url>       HTTP(S) site URL to import cookies from
+  --cookie-file <path>     JSON cookie export or Playwright storage-state file
   --persist-cookies        remember the provided --cookie-url values
   --consent                create ~/.config/cloak without prompting
 
@@ -306,6 +324,11 @@ function buildDaemonStartProgram(args: string[] = []): Argv {
       description: "HTTP(S) site URL to import cookies from",
       coerce: normalizeUrls,
     })
+    .option("cookie-file", {
+      type: "string",
+      description: "JSON cookie export or Playwright storage-state file",
+      coerce: normalizeFilePath,
+    })
     .option("persist-cookies", {
       type: "boolean",
       description: "remember the provided --cookie-url values for this profile",
@@ -335,6 +358,7 @@ Options:
   -w, --window             open a visible browser window
   --profile <profile>      Chrome profile directory name
   --cookie-url <url>       HTTP(S) site URL to import cookies from
+  --cookie-file <path>     JSON cookie export or Playwright storage-state file
   --persist-cookies        remember the provided --cookie-url values
   --consent                create ~/.config/cloak without prompting
 `
@@ -466,6 +490,7 @@ function parseRunMode(args: string[]): CliConfig {
     window?: boolean
     profile?: string
     cookieUrl?: string[]
+    cookieFile?: string
     persistCookies?: boolean
     consent?: boolean
   }
@@ -485,6 +510,7 @@ function parseRunMode(args: string[]): CliConfig {
     consent: Boolean(options.consent),
     profile: options.profile,
     cookieUrls: options.cookieUrl ?? [],
+    cookieFile: options.cookieFile,
   }
 }
 
@@ -495,6 +521,7 @@ function parseDaemonStartMode(args: string[]): CliConfig {
     window?: boolean
     profile?: string
     cookieUrl?: string[]
+    cookieFile?: string
     persistCookies?: boolean
     consent?: boolean
   }
@@ -514,6 +541,7 @@ function parseDaemonStartMode(args: string[]): CliConfig {
     consent: Boolean(options.consent),
     profile: options.profile,
     cookieUrls: options.cookieUrl ?? [],
+    cookieFile: options.cookieFile,
   }
 }
 

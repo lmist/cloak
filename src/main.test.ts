@@ -122,6 +122,41 @@ test("resolveStartupCookies loads every requested URL and warns once", async () 
   assert.equal(warnings.length, 1)
 })
 
+test("resolveStartupCookies loads a cookie file without a Chrome warning", async () => {
+  const warnings: string[] = []
+
+  const cookies = await resolveStartupCookies(
+    {
+      cookieUrls: [],
+      cookieFile: "/tmp/cookies.json",
+    },
+    {
+      readCookiesFromFile: (filePath) => {
+        assert.equal(filePath, "/tmp/cookies.json")
+        return [
+          {
+            name: "session",
+            value: "abc",
+            domain: ".x.com",
+            path: "/",
+          },
+        ]
+      },
+      warn: (message: string) => warnings.push(message),
+    }
+  )
+
+  assert.deepEqual(cookies, [
+    {
+      name: "session",
+      value: "abc",
+      domain: ".x.com",
+      path: "/",
+    },
+  ])
+  assert.deepEqual(warnings, [])
+})
+
 test("main saves the selected profile", async () => {
   const appPaths = createAppPaths()
   const logger = createLogCollector()
@@ -276,6 +311,59 @@ test("main run uses the default profile and remembered cookie URLs", async () =>
   assert.equal(addedCookies.length, 1)
 })
 
+test("main run loads cookies from a cookie file without requiring a profile", async () => {
+  const appPaths = createAppPaths()
+  const logger = createLogCollector()
+  const addedCookies: Cookie[][] = []
+  const cookieFilePath = path.join(appPaths.configDir, "cookies.json")
+
+  await main(
+    [
+      "node",
+      "dist/main.js",
+      "run",
+      "--cookie-file",
+      cookieFilePath,
+    ],
+    {
+      appPaths,
+      log: logger.log,
+      readCookiesFromFile: (filePath) => {
+        assert.equal(filePath, cookieFilePath)
+        return [
+          {
+            name: "session",
+            value: "abc",
+            domain: ".x.com",
+            path: "/",
+          },
+        ]
+      },
+      prepareRequiredExtension: async () => "/tmp/opencli-extension",
+      makeTempDir: () => "/tmp/cloak-profile",
+      makeDir: () => undefined,
+      writeFile: () => undefined,
+      launchPersistentContext: async () => fakeContext({ addedCookies }),
+    }
+  )
+
+  assert.match(logger.lines[0] ?? "", /profile: \(none\)/)
+  assert.match(
+    logger.lines[0] ?? "",
+    new RegExp(cookieFilePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+  )
+  assert.deepEqual(addedCookies, [
+    [
+      {
+        name: "session",
+        value: "abc",
+        domain: ".x.com",
+        path: "/",
+      },
+    ],
+  ])
+})
+
 test("main run remembers explicit cookie URLs when asked", async () => {
   const appPaths = createAppPaths()
   fs.mkdirSync(appPaths.configDir, { recursive: true })
@@ -357,8 +445,45 @@ test("main run in daemon mode stores daemon state", async () => {
     pid: 4242,
     headless: true,
     profile: "Profile 7",
+    cookieFile: undefined,
     cookieUrls: ["https://x.com/"],
     startedAt: "2026-04-10T10:00:00.000Z",
+    logPath: appPaths.daemonLogPath,
+  })
+})
+
+test("main daemon start accepts a cookie file without a profile", async () => {
+  const appPaths = createAppPaths()
+  const logger = createLogCollector()
+  const cookieFilePath = path.join(appPaths.configDir, "cookies.json")
+
+  await main(
+    [
+      "node",
+      "dist/main.js",
+      "daemon",
+      "start",
+      "--consent",
+      "--cookie-file",
+      cookieFilePath,
+    ],
+    {
+      appPaths,
+      log: logger.log,
+      spawnDaemonProcess: () => 4243,
+      now: () => new Date("2026-04-10T10:05:00.000Z"),
+    }
+  )
+
+  const stateDb = new CloakStateDb(appPaths.stateDbPath)
+  assert.match(logger.lines.at(-1) ?? "", /Started cloak daemon \(4243\)/)
+  assert.deepEqual(stateDb.getDaemonState(), {
+    pid: 4243,
+    headless: true,
+    profile: undefined,
+    cookieFile: cookieFilePath,
+    cookieUrls: [],
+    startedAt: "2026-04-10T10:05:00.000Z",
     logPath: appPaths.daemonLogPath,
   })
 })
@@ -371,6 +496,7 @@ test("main daemon status reports the active daemon", async () => {
     pid: 4242,
     headless: true,
     profile: "Profile 7",
+    cookieFile: "/tmp/cookies.json",
     cookieUrls: ["https://x.com"],
     startedAt: "2026-04-10T10:00:00.000Z",
     logPath: appPaths.daemonLogPath,
@@ -385,6 +511,7 @@ test("main daemon status reports the active daemon", async () => {
 
   assert.match(logger.lines[0] ?? "", /pid: 4242/)
   assert.match(logger.lines[0] ?? "", /status: running/)
+  assert.match(logger.lines[0] ?? "", /cookie file: \/tmp\/cookies\.json/)
 })
 
 test("main daemon logs prints the cached daemon log", async () => {
@@ -423,6 +550,7 @@ test("main storage show reports the sqlite path and current state summary", asyn
     pid: 4242,
     headless: true,
     profile: "Profile 7",
+    cookieFile: undefined,
     cookieUrls: ["https://x.com"],
     startedAt: "2026-04-10T10:00:00.000Z",
     logPath: appPaths.daemonLogPath,
@@ -448,6 +576,7 @@ test("main daemon stop clears the saved daemon state", async () => {
     pid: 4242,
     headless: true,
     profile: "Profile 7",
+    cookieFile: undefined,
     cookieUrls: ["https://x.com"],
     startedAt: "2026-04-10T10:00:00.000Z",
     logPath: appPaths.daemonLogPath,
@@ -474,6 +603,7 @@ test("main storage destroy confirms, stops the daemon, and removes the config di
     pid: 4242,
     headless: true,
     profile: "Profile 7",
+    cookieFile: undefined,
     cookieUrls: ["https://x.com"],
     startedAt: "2026-04-10T10:00:00.000Z",
     logPath: appPaths.daemonLogPath,
@@ -507,6 +637,7 @@ test("main daemon restart reuses the last daemon command", async () => {
   stateDb.setLastDaemonCommand({
     headless: true,
     profile: "Profile 7",
+    cookieFile: "/tmp/cookies.json",
     cookieUrls: ["https://x.com"],
   })
   const logger = createLogCollector()
@@ -520,4 +651,5 @@ test("main daemon restart reuses the last daemon command", async () => {
 
   assert.match(logger.lines[0] ?? "", /Started cloak daemon \(5150\)/)
   assert.equal(stateDb.getDaemonState()?.pid, 5150)
+  assert.equal(stateDb.getDaemonState()?.cookieFile, "/tmp/cookies.json")
 })

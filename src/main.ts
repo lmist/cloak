@@ -7,7 +7,7 @@ import readline from "node:readline/promises"
 import { resolveAppPaths, type AppPaths } from "./app-paths.js"
 import { buildRunArguments, isProcessRunning, spawnDaemonProcess, stopProcess } from "./daemon.js"
 import { prepareRequiredExtension } from "./extension.js"
-import type { Cookie } from "./cookies.js"
+import { readCookiesFromFile, type Cookie } from "./cookies.js"
 import { parseCli, type RunModeConfig } from "./cli.js"
 import {
   CHROME_COOKIE_LIMITATION_WARNING,
@@ -30,6 +30,7 @@ import { formatError, formatInfo, formatSuccess, formatWarning } from "./output.
 
 type ResolveStartupCookiesDependencies = {
   readChromeCookies?: typeof readChromeCookies;
+  readCookiesFromFile?: typeof readCookiesFromFile;
   warn?: (message: string) => void;
 };
 
@@ -96,6 +97,7 @@ type ResolvedRunConfig = {
   daemon: boolean;
   profile?: string;
   cookieUrls: string[];
+  cookieFile?: string;
   explicitCookieUrls: string[];
   persistCookies: boolean;
 };
@@ -177,20 +179,24 @@ export function parseSelectionInput(
 export async function resolveStartupCookies(
   options: {
     cookieUrls: string[];
+    cookieFile?: string;
     profile?: string;
   },
   dependencies: ResolveStartupCookiesDependencies = {}
 ): Promise<Cookie[]> {
-  if (options.cookieUrls.length === 0) {
+  if (options.cookieUrls.length === 0 && !options.cookieFile) {
     return []
   }
 
   const readChromeCookiesFn =
     dependencies.readChromeCookies ?? readChromeCookies
+  const readCookiesFromFileFn =
+    dependencies.readCookiesFromFile ?? readCookiesFromFile
   const warn =
     dependencies.warn ??
     ((message: string) => console.warn(formatWarning(message)))
   const importedCookies: Cookie[] = []
+  let usedChromeProfileImport = false
 
   for (const url of options.cookieUrls) {
     const cookies = await readChromeCookiesFn({
@@ -203,9 +209,16 @@ export async function resolveStartupCookies(
     }
 
     importedCookies.push(...cookies)
+    usedChromeProfileImport = true
   }
 
-  warn(CHROME_COOKIE_LIMITATION_WARNING)
+  if (options.cookieFile) {
+    importedCookies.push(...readCookiesFromFileFn(options.cookieFile))
+  }
+
+  if (usedChromeProfileImport) {
+    warn(CHROME_COOKIE_LIMITATION_WARNING)
+  }
 
   return dedupeCookies(importedCookies)
 }
@@ -612,6 +625,7 @@ async function handleRestart(
     command = {
       headless: currentDaemon.headless,
       profile: currentDaemon.profile,
+      cookieFile: currentDaemon.cookieFile,
       cookieUrls: currentDaemon.cookieUrls,
     }
 
@@ -648,6 +662,9 @@ async function resolveRunConfig(
   const profile = defaultProfile
     ? (await resolveChromeProfile(defaultProfile, dependencies)).directory
     : undefined
+  const cookieFile = cli.cookieFile
+    ? path.resolve(cli.cookieFile)
+    : undefined
   const explicitCookieUrls = cli.cookieUrls
   const rememberedCookieUrls =
     explicitCookieUrls.length === 0 && profile && stateDb
@@ -667,6 +684,7 @@ async function resolveRunConfig(
     daemon: cli.daemon,
     profile,
     cookieUrls,
+    cookieFile,
     explicitCookieUrls,
     persistCookies: cli.persistCookies,
   }
@@ -700,6 +718,7 @@ async function handleDaemonRun(
     {
       headless: config.headless,
       profile: config.profile,
+      cookieFile: config.cookieFile,
       cookieUrls: config.cookieUrls,
     },
     appPaths,
@@ -881,6 +900,7 @@ function formatRunSettings(config: ResolvedRunConfig): string {
   const lines = [
     "Running with settings",
     `profile: ${config.profile ?? "(none)"}`,
+    `cookie file: ${config.cookieFile ?? "(none)"}`,
     "cookie urls:",
   ]
 
@@ -901,6 +921,7 @@ function formatDaemonState(state: DaemonState): string {
     `pid: ${state.pid}`,
     "status: running",
     `profile: ${state.profile ?? "(none)"}`,
+    `cookie file: ${state.cookieFile ?? "(none)"}`,
     `headless: ${state.headless ? "yes" : "no"}`,
     `started at: ${state.startedAt}`,
     `log: ${state.logPath}`,

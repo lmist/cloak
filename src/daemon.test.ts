@@ -11,6 +11,7 @@ test("buildRunArguments serializes the saved daemon command", () => {
     buildRunArguments({
       headless: false,
       profile: "Profile 7",
+      cookieFile: "/tmp/cookies.json",
       cookieUrls: ["https://x.com", "https://github.com"],
     }),
     [
@@ -18,6 +19,8 @@ test("buildRunArguments serializes the saved daemon command", () => {
       "--window",
       "--profile",
       "Profile 7",
+      "--cookie-file",
+      "/tmp/cookies.json",
       "--cookie-url",
       "https://x.com",
       "--cookie-url",

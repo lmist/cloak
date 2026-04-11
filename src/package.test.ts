@@ -139,6 +139,7 @@ test("readme documents the current CLI surface", () => {
   assert.match(readme, /cloak profile show/)
   assert.match(readme, /cloak version/)
   assert.match(readme, /cloak sites list/)
+  assert.match(readme, /cloak run --cookie-file \.\/cookies\.json/)
   assert.match(readme, /cloak run --persist-cookies --consent --cookie-url https:\/\/x\.com/)
   assert.match(readme, /cloak run --profile "Profile 7" --persist-cookies --consent --cookie-url https:\/\/x\.com/)
   assert.match(readme, /cloak daemon start/)

@@ -36,6 +36,10 @@ export function buildRunArguments(command: StoredRunCommand): string[] {
     args.push("--profile", command.profile);
   }
 
+  if (command.cookieFile) {
+    args.push("--cookie-file", command.cookieFile);
+  }
+
   for (const url of command.cookieUrls) {
     args.push("--cookie-url", url);
   }

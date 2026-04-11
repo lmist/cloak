@@ -16,6 +16,7 @@ export type StoredRunCommand = {
   headless: boolean;
   profile?: string;
   cookieUrls: string[];
+  cookieFile?: string;
 };
 
 export type DaemonState = StoredRunCommand & {
@@ -59,11 +60,22 @@ function initializeSchema(database: DatabaseLike) {
       pid INTEGER NOT NULL,
       profile TEXT,
       cookie_urls TEXT NOT NULL,
+      cookie_file TEXT,
       headless INTEGER NOT NULL,
       started_at TEXT NOT NULL,
       log_path TEXT NOT NULL
     );
   `);
+
+  const daemonStateColumns = database
+    .prepare("PRAGMA table_info(daemon_state)")
+    .all()
+    .map((row) => row.name)
+    .filter((value): value is string => typeof value === "string");
+
+  if (!daemonStateColumns.includes("cookie_file")) {
+    database.exec("ALTER TABLE daemon_state ADD COLUMN cookie_file TEXT;");
+  }
 }
 
 function readJson<T>(value: string | undefined): T | undefined {
@@ -180,7 +192,7 @@ export class CloakStateDb {
       const row = database
         .prepare(
           [
-            "SELECT pid, profile, cookie_urls, headless, started_at, log_path",
+            "SELECT pid, profile, cookie_urls, cookie_file, headless, started_at, log_path",
             "FROM daemon_state",
             "WHERE slot = 1",
           ].join(" ")
@@ -203,6 +215,8 @@ export class CloakStateDb {
         pid: row.pid,
         profile: typeof row.profile === "string" ? row.profile : undefined,
         cookieUrls,
+        cookieFile:
+          typeof row.cookie_file === "string" ? row.cookie_file : undefined,
         headless: row.headless === 1,
         startedAt:
           typeof row.started_at === "string"
@@ -219,12 +233,13 @@ export class CloakStateDb {
         .prepare(
           [
             "INSERT INTO daemon_state",
-            "(slot, pid, profile, cookie_urls, headless, started_at, log_path)",
-            "VALUES (1, ?, ?, ?, ?, ?, ?)",
+            "(slot, pid, profile, cookie_urls, cookie_file, headless, started_at, log_path)",
+            "VALUES (1, ?, ?, ?, ?, ?, ?, ?)",
             "ON CONFLICT(slot) DO UPDATE SET",
             "pid = excluded.pid,",
             "profile = excluded.profile,",
             "cookie_urls = excluded.cookie_urls,",
+            "cookie_file = excluded.cookie_file,",
             "headless = excluded.headless,",
             "started_at = excluded.started_at,",
             "log_path = excluded.log_path",
@@ -234,6 +249,7 @@ export class CloakStateDb {
           state.pid,
           state.profile ?? null,
           JSON.stringify(normalizeCookieUrls(state.cookieUrls)),
+          state.cookieFile ?? null,
           state.headless ? 1 : 0,
           state.startedAt,
           state.logPath
@@ -263,7 +279,12 @@ export class CloakStateDb {
         typeof row?.value === "string" ? row.value : undefined
       );
 
-      if (!command || !Array.isArray(command.cookieUrls)) {
+      if (
+        !command ||
+        !Array.isArray(command.cookieUrls) ||
+        (command.cookieFile !== undefined &&
+          typeof command.cookieFile !== "string")
+      ) {
         return undefined;
       }
 
@@ -271,6 +292,7 @@ export class CloakStateDb {
         headless: Boolean(command.headless),
         profile: command.profile,
         cookieUrls: normalizeCookieUrls(command.cookieUrls),
+        cookieFile: command.cookieFile,
       };
     });
   }
@@ -280,6 +302,7 @@ export class CloakStateDb {
       headless: Boolean(command.headless),
       profile: command.profile,
       cookieUrls: normalizeCookieUrls(command.cookieUrls),
+      cookieFile: command.cookieFile,
     };
 
     this.withDatabase((database) => {
